@@ -43,6 +43,8 @@ describe('anonymous RSVP rules', () => {
     await assertSucceeds(set(ref(guestDatabase, 'privateEvents/published-event/inbox/submission-one'), {
       token: '0123456789012345678901234567890123456789012',
       createdAt: 100,
+      decision: 'confirmed',
+      companions: [{ name: 'Caio', age: 7 }],
     }));
     await assertSucceeds(set(ref(ownerDatabase, 'publicEditCapabilities/owner-capability'), {
       eventId: 'published-event',
@@ -53,6 +55,7 @@ describe('anonymous RSVP rules', () => {
       createdAt: 100,
       updatedAt: 100,
       status: 'unmatched',
+      companions: [{ name: 'Caio', age: 7 }],
     }));
     await assertSucceeds(set(ref(guestDatabase, 'publicEditCapabilities/0123456789012345678901234567890123456789012'), {
       eventId: 'published-event',
@@ -138,6 +141,30 @@ describe('anonymous RSVP rules', () => {
       updatedAt: 100,
       status: 'matched',
       guestId: 'forged-guest',
+    }));
+  });
+
+  it('rejects companions with invalid ages or more than 20 entries', async () => {
+    const guestDatabase = testEnvironment.unauthenticatedContext().database();
+    const token = '3123456789012345678901234567890123456789012';
+    const capability = {
+      eventId: 'published-event',
+      submissionId: 'submission-with-companions',
+      name: 'Helena',
+      decision: 'confirmed',
+      message: '',
+      createdAt: 100,
+      updatedAt: 100,
+      status: 'unmatched',
+    };
+
+    await assertFails(set(ref(guestDatabase, `publicEditCapabilities/${token}`), {
+      ...capability,
+      companions: [{ name: 'Caio', age: 121 }],
+    }));
+    await assertFails(set(ref(guestDatabase, `publicEditCapabilities/${token}`), {
+      ...capability,
+      companions: Array.from({ length: 21 }, (_, index) => ({ name: `Pessoa ${index + 1}`, age: 7 })),
     }));
   });
 

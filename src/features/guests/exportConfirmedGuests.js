@@ -1,16 +1,19 @@
+import { confirmedParticipants } from './participantList.js';
+
 function csvField(value) {
   return `"${String(value ?? '').replaceAll('"', '""')}"`;
 }
 
 export function confirmedGuestsCsv(guests) {
-  const confirmedRows = guests
-    .filter((guest) => guest.status === 'confirmed')
-    .map((guest) => [
-      csvField(guest.name),
+  const confirmedRows = confirmedParticipants(guests)
+    .map((participant) => [
+      csvField(participant.name),
+      csvField(participant.age),
+      csvField(participant.companionOf),
       csvField('Confirmado'),
-      csvField(guest.updatedAt ? new Date(guest.updatedAt).toISOString() : ''),
+      csvField(participant.updatedAt ? new Date(participant.updatedAt).toISOString() : ''),
     ].join(','));
-  return [`\uFEFFNome,Situação,Data da última resposta`, ...confirmedRows].join('\r\n');
+  return [`\uFEFFNome,Idade,Convidado principal,Situação,Data da última resposta`, ...confirmedRows].join('\r\n');
 }
 
 export function downloadConfirmedGuests(guests, filename = 'convidados-confirmados.csv') {

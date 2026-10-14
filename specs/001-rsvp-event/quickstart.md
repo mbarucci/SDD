@@ -43,6 +43,7 @@ npm run build
 10. Testar URLs HTTPS inválidas/indisponíveis, fallback acessível e texto alternativo de fotos; confirmar que a página não depende da galeria e que o provedor recebe requisição diretamente do navegador.
 11. Navegar por teclado pela página e formulários; confirmar ordem de foco, foco visível e nomes acessíveis em links e controles.
 12. Cadastrar até 100 convidados e confirmar que o 101º é recusado com explicação. Simular falha de conexão/gravação e confirmar que o formulário é preservado e pode ser reenviado. O Spark limita 100 conexões simultâneas totais por instância, incluindo o anfitrião; teste no emulador não comprova quotas reais.
+13. Confirmar RSVP com acompanhantes de nomes e idades válidos; verificar que cada pessoa soma um ao total confirmado, aparece sob o convidado principal e ganha linha própria no CSV. Testar idade vazia, decimal, fora de 0–120 e o 21º acompanhante; editar pelo link individual, remover acompanhantes e recusar presença, confirmando que a lista e os totais são atualizados.
 
 ## Deploy
 

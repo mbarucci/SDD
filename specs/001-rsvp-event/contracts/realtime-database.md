@@ -37,6 +37,7 @@ Este contrato especifica fronteiras de autorização para o SDK Web. Não define
 - Visitante não autenticado pode criar somente uma submissão nova em `privateEvents/{eventId}/inbox/{submissionId}`.
 - Validar evento publicado, estado enumerado, campos obrigatórios, tipos, comprimentos máximos e ausência de propriedades inesperadas.
 - Limitar mensagens a 500 caracteres; uma mensagem deve acompanhar uma decisão válida, inclusive quando enviada por edição sem alterar a decisão existente.
+- Permitir até 20 acompanhantes somente para RSVP confirmado; cada item exige nome de 1 a 100 caracteres e idade inteira de 0 a 120. Restringir índices a `0`–`19` nas Rules.
 - Negar listagem/leitura pública da inbox, roster e mensagens; somente o UID proprietário lê e associa submissões.
 - Impedir que a submissão altere `ownerUid`, dados do evento, outras respostas ou registros privados.
 - Não assumir que essas validações impedem spam, abuso de cota ou RSVP por outra pessoa. RTDB Rules não oferecem rate limiting confiável por IP/identidade anônima.
@@ -50,6 +51,7 @@ Este contrato especifica fronteiras de autorização para o SDK Web. Não define
 - A capacidade permite ler/editar somente a resposta correspondente; não pode listar inbox/roster, mensagens privadas ou outras respostas.
 - Tokens não expiram automaticamente. O anfitrião pode revogar o token e emitir outro, invalidando o anterior; o convidado solicita novo link ao anfitrião, sem reenvio automatizado.
 - Edições concorrentes pela mesma capacidade atualizam o mesmo registro e a última gravação aceita prevalece.
+- O mesmo token atualiza os acompanhantes do RSVP; recusar presença ou remover todos os acompanhantes deve limpar a lista no registro privado e na projeção do roster.
 - Tratar a URL como segredo bearer: analytics, logs, referrer e compartilhamento do link podem expor acesso.
 - Cobrir leitura/gravação da resposta específica com testes no emulador antes de aprovar.
 
@@ -58,7 +60,7 @@ Este contrato especifica fronteiras de autorização para o SDK Web. Não define
 1. Negar por padrão; nenhuma permissão ampla no root ou em ancestral misto.
 2. Proprietário comparado com dado já persistido; o cliente não escolhe nem altera a propriedade.
 3. Dados privados legíveis somente pelo dono autenticado, exceto capacidade individual explicitamente aprovada.
-4. Validar esquema, limites e enumerações em Rules; rejeitar campos adicionais e exclusões que ignorem validação. Excluir submissão sem correspondência é uma ação autenticada do proprietário.
+4. Validar esquema, limites e enumerações em Rules; rejeitar campos adicionais e exclusões que ignorem validação. A lista de acompanhantes aceita somente índices `0`–`19`, nomes de até 100 caracteres e idades inteiras entre 0 e 120. Excluir submissão sem correspondência é uma ação autenticada do proprietário.
 5. Regras são testadas com usuário proprietário, outro usuário autenticado e usuário anônimo no Firebase Emulator Suite.
 6. App Check pode ser avaliado como redução adicional de abuso, mas não é identidade nem garantia contra abuso e não substitui Rules.
 

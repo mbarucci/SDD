@@ -28,3 +28,24 @@ test('preserves the RSVP fields after a recoverable submission failure', async (
   expect(screen.getByLabelText('Vou comparecer')).toBeChecked();
   expect(screen.getByLabelText('Mensagem ao anfitrião')).toHaveValue('Vou levar uma sobremesa.');
 });
+
+test('submits companion names and ages with a confirmed RSVP', async () => {
+  const user = userEvent.setup();
+  submitRsvp.mockResolvedValueOnce({ token: 'capability-1' });
+
+  render(<GuestRsvpForm eventId="event-1" />);
+  await user.type(screen.getByLabelText('Seu nome'), 'Helena');
+  await user.click(screen.getByLabelText('Vou comparecer'));
+  await user.click(screen.getByRole('button', { name: 'Adicionar acompanhante' }));
+  await user.type(screen.getByLabelText('Nome do acompanhante 1'), 'Caio');
+  await user.type(screen.getByLabelText('Idade do acompanhante 1'), '7');
+  await user.click(screen.getByRole('button', { name: 'Enviar resposta' }));
+
+  expect(submitRsvp).toHaveBeenCalledWith({
+    eventId: 'event-1',
+    name: 'Helena',
+    decision: 'confirmed',
+    message: '',
+    companions: [{ name: 'Caio', age: '7' }],
+  });
+});

@@ -1,6 +1,7 @@
 import { get, ref, set } from 'firebase/database';
 import { getFirebaseClient } from '../../services/firebase/client.js';
 import { editCapabilityPath } from '../../services/firebase/paths.js';
+import { normalizeCompanions } from './companionValidation.js';
 
 export async function getEditCapability(token) {
   const { database } = getFirebaseClient();
@@ -13,6 +14,7 @@ export async function saveEditCapability(capability, fields) {
   const { token, ...record } = capability;
   const name = fields.name.trim();
   const message = fields.message.trim();
+  const companions = normalizeCompanions(fields.companions ?? [], fields.decision);
   if (!name) throw new Error('Informe seu nome.');
   if (!['confirmed', 'declined'].includes(fields.decision)) throw new Error('Escolha uma opção de resposta.');
   if (message.length > 500) throw new Error('A mensagem deve ter até 500 caracteres.');
@@ -23,7 +25,9 @@ export async function saveEditCapability(capability, fields) {
     decision: fields.decision,
     message,
     updatedAt: Date.now(),
+    ...(companions.length > 0 && { companions }),
   };
+  if (companions.length === 0) delete updated.companions;
   if (name !== capability.name) {
     updated.status = 'unmatched';
     const previousGuestId = capability.guestId ?? capability.previousGuestId;

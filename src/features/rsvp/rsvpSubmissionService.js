@@ -3,6 +3,7 @@ import { getFirebaseClient } from '../../services/firebase/client.js';
 import { editCapabilityPath, inboxPath } from '../../services/firebase/paths.js';
 import { getPublishedEvent } from '../event/publicEventRepository.js';
 import { normalizeName } from '../guests/normalizeName.js';
+import { normalizeCompanions } from './companionValidation.js';
 
 function createEditToken() {
   const bytes = new Uint8Array(32);
@@ -10,7 +11,7 @@ function createEditToken() {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function submitRsvp({ eventId, name, decision, message = '' }) {
+export async function submitRsvp({ eventId, name, decision, message = '', companions = [] }) {
   const normalizedName = normalizeName(name);
   const displayName = name.trim().replace(/\s+/gu, ' ');
   const trimmedMessage = message.trim();
@@ -18,6 +19,7 @@ export async function submitRsvp({ eventId, name, decision, message = '' }) {
   if (displayName.length > 100) throw new Error('O nome deve ter até 100 caracteres.');
   if (!['confirmed', 'declined'].includes(decision)) throw new Error('Escolha uma opção de resposta.');
   if (trimmedMessage.length > 500) throw new Error('A mensagem deve ter até 500 caracteres.');
+  const normalizedCompanions = normalizeCompanions(companions, decision);
   if (!await getPublishedEvent(eventId)) throw new Error('Este evento não está disponível.');
 
   const { database } = getFirebaseClient();
@@ -34,6 +36,7 @@ export async function submitRsvp({ eventId, name, decision, message = '' }) {
     createdAt: timestamp,
     updatedAt: timestamp,
     status: 'unmatched',
+    ...(normalizedCompanions.length > 0 && { companions: normalizedCompanions }),
   };
 
   await update(ref(database), {
@@ -46,6 +49,7 @@ export async function submitRsvp({ eventId, name, decision, message = '' }) {
       createdAt: timestamp,
       updatedAt: timestamp,
       status: 'unmatched',
+      ...(normalizedCompanions.length > 0 && { companions: normalizedCompanions }),
     },
     [editCapabilityPath(token)]: capability,
   });

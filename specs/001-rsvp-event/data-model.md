@@ -38,6 +38,7 @@ Este modelo é uma proposta para Firebase Realtime Database. Os caminhos exatos 
 - `name`: nome cadastrado pelo anfitrião.
 - `normalizedName`: chave derivada de forma Unicode canônica, caixa ignorada e espaços externos/repetidos removidos; acentos e pontuação são preservados.
 - `status`: `pending`, `confirmed` ou `declined`.
+- `companions`: lista privada opcional de até 20 acompanhantes do RSVP confirmado; cada item contém nome (até 100 caracteres) e idade inteira entre 0 e 120. Cada acompanhante conta como participante confirmado adicional.
 - Relação: uma resposta associada; nomes duplicados exigem resolução pelo anfitrião.
 
 ### Submissão RSVP
@@ -46,6 +47,7 @@ Este modelo é uma proposta para Firebase Realtime Database. Os caminhos exatos 
 - `submittedName`: texto não confiável informado pelo visitante.
 - `decision`: `confirmed` ou `declined`.
 - `message`: texto opcional de até 500 caracteres, enviado junto da resposta e sempre tratado como texto.
+- `companions`: lista opcional, permitida somente quando `decision` é `confirmed`, com até 20 itens `{ name, age }`; permanece vinculada a esta submissão e à sua capacidade de edição.
 - `createdAt`: timestamp validado na criação.
 - `guestId`: preenchido pelo cliente autenticado do anfitrião somente depois de associação autorizada; duplicatas aguardam resolução manual.
 - `status`: `unmatched`, `matched` ou `duplicate-review` até associação pelo anfitrião.
@@ -55,6 +57,7 @@ Este modelo é uma proposta para Firebase Realtime Database. Os caminhos exatos 
 
 - `token`: segredo aleatório de alta entropia, usado como capacidade bearer para uma única resposta.
 - `submissionId`: resposta que essa capacidade autoriza editar.
+- `companions`: acompanhantes da resposta, atualizados pelo mesmo token e removidos quando a resposta é recusada ou a lista é esvaziada.
 - `revokedAt`: timestamp opcional de revogação pelo anfitrião; tokens não expiram automaticamente.
 - Rotação: emitir novo token revoga o anterior; não há reenvio automatizado.
 - Qualquer pessoa que obtenha o token poderá agir como o convidado daquela resposta; o token não comprova identidade.
@@ -66,6 +69,7 @@ Este modelo é uma proposta para Firebase Realtime Database. Os caminhos exatos 
 - Nome inexistente ou duplicado não deve alterar o estado de um convidado antes da resolução pelo anfitrião; envios não associados ficam na inbox até ação manual, sem expiração automática.
 - Ao associar uma submissão, o anfitrião altera o estado do mesmo registro e o RSVP continua privado; não é necessária cópia para outro caminho.
 - Uma edição com capacidade válida atualiza a resposta existente, não cria duplicata.
+- Acompanhantes são associados ao RSVP principal, copiados para o registro privado do convidado após associação e removidos da projeção quando a resposta deixa de ser confirmada.
 - Renomear uma resposta coloca a associação em revisão; nenhum convidado muda de estado até o anfitrião resolver a nova associação.
 - Reenvios pelo formulário público recebem IDs independentes; depois de associados, a submissão aceita mais recentemente define o estado do convidado. Edições pelo mesmo token atualizam um registro e a última gravação aceita prevalece.
 
@@ -87,11 +91,14 @@ publicEvents/{eventId}
 privateEvents/{eventId}
   ownerUid
   guests/{guestId}
+    companions/{index} -> name, age
   inbox/{submissionId}
+    companions/{index} -> name, age
 
 publicEditCapabilities/{token}
   eventId
   submissionId
+  companions/{index} -> name, age
   revokedAt
 ```
 

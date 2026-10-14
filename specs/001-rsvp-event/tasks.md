@@ -200,6 +200,7 @@ Depois de T023 (Rules), implementar T024 (leitura pública) e T027 (capacidade i
 - [ ] T052 MEDIUM Validar em um celular a leitura do QR Code e confirmar que ele abre o mesmo evento do link público, conforme FR-005 e US1/AC2 (partial).
 - [X] T053 MEDIUM Adicionar teste de regressão para falha recuperável de gravação que confirme mensagem para tentar novamente e preservação dos dados do formulário, conforme FR-026 e Constituição III (partial).
 - [ ] T054 MEDIUM Validar em projeto Firebase real no plano Spark o Hosting, as rotas/redirects de Authentication e os limites de conexão/transferência antes da divulgação, sem vincular billing, conforme as pendências de liberação do plano (partial).
+- [X] T055 HIGH Implementar RSVP com até 20 acompanhantes vinculados ao RSVP confirmado; validar nome/idade nas Rules e no cliente, editar pelo link individual, projetar cada pessoa como participante adicional no painel e no CSV e limpar acompanhantes quando houver recusa ou reassociação.
 
 ### Estado das pendências
 

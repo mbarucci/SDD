@@ -22,6 +22,12 @@ test('host reviews duplicate RSVP, reads its private message, and finds inbox af
   await guestPage.goto(eventUrl);
   await guestPage.getByLabel('Seu nome').fill('Alex Silva');
   await guestPage.getByLabel('Vou comparecer').check();
+  await guestPage.getByRole('button', { name: 'Adicionar acompanhante' }).click();
+  await guestPage.getByLabel('Nome do acompanhante 1').fill('Bento Silva');
+  await guestPage.getByLabel('Idade do acompanhante 1').fill('7');
+  await guestPage.getByRole('button', { name: 'Adicionar acompanhante' }).click();
+  await guestPage.getByLabel('Nome do acompanhante 2').fill('Cecília Silva');
+  await guestPage.getByLabel('Idade do acompanhante 2').fill('35');
   await guestPage.getByLabel('Mensagem ao anfitrião').fill('Preciso de opção vegetariana.');
   await guestPage.getByRole('button', { name: 'Enviar resposta' }).click();
 
@@ -30,8 +36,12 @@ test('host reviews duplicate RSVP, reads its private message, and finds inbox af
   await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Pendentes: 2');
   await page.getByLabel('Associar resposta de Alex Silva').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Associar resposta' }).click();
-  await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Confirmados: 1');
+  await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Confirmados: 3');
   await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Pendentes: 1');
+  await expect(page.getByText('Bento Silva')).toBeVisible();
+  await expect(page.getByText('7 anos')).toBeVisible();
+  await expect(page.getByText('Cecília Silva')).toBeVisible();
+  await expect(page.getByText('35 anos')).toBeVisible();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Exportar confirmados (CSV)' }).first().click();
   const download = await downloadPromise;

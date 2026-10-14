@@ -33,6 +33,35 @@ test('guest edits the existing RSVP through its individual link', async ({ page 
   await expect(page.getByRole('link', { name: 'Editar minha resposta' })).toHaveAttribute('href', originalEditUrl);
 });
 
+test('guest can edit companion names and ages through the individual RSVP link', async ({ page }) => {
+  await openPublishedEventAsGuest(page);
+  await page.getByLabel('Seu nome').fill('Rafaela');
+  await page.getByLabel('Vou comparecer').check();
+  await page.getByRole('button', { name: 'Adicionar acompanhante' }).click();
+  await page.getByLabel('Nome do acompanhante 1').fill('Caio');
+  await page.getByLabel('Idade do acompanhante 1').fill('7');
+  await page.getByRole('button', { name: 'Enviar resposta' }).click();
+
+  const editLink = page.getByRole('link', { name: 'Editar minha resposta' });
+  await page.goto(await editLink.getAttribute('href'));
+  await expect(page.getByLabel('Nome do acompanhante 1')).toHaveValue('Caio');
+  await expect(page.getByLabel('Idade do acompanhante 1')).toHaveValue('7');
+  await page.getByLabel('Nome do acompanhante 1').fill('Caio Silva');
+  await page.getByLabel('Idade do acompanhante 1').fill('8');
+  await page.getByRole('button', { name: 'Salvar resposta' }).click();
+
+  await expect(page.getByRole('status')).toContainText('Resposta atualizada');
+  await expect(page.getByLabel('Nome do acompanhante 1')).toHaveValue('Caio Silva');
+  await expect(page.getByLabel('Idade do acompanhante 1')).toHaveValue('8');
+
+  await page.getByLabel('Não poderei ir').check();
+  await page.getByRole('button', { name: 'Salvar resposta' }).click();
+  await expect(page.getByRole('status')).toContainText('Resposta atualizada');
+  await page.reload();
+  await expect(page.getByLabel('Não poderei ir')).toBeChecked();
+  await expect(page.getByLabel('Nome do acompanhante 1')).toHaveCount(0);
+});
+
 test('an invalid edit token does not reveal an RSVP', async ({ page }) => {
   await page.goto('/edit/not-a-valid-capability');
   await expect(page.getByRole('heading', { name: 'Link de edição indisponível' })).toBeVisible();

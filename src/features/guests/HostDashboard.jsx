@@ -4,6 +4,7 @@ import EditLinkControls from './EditLinkControls.jsx';
 import InboxReview from './InboxReview.jsx';
 import HostMessages from './HostMessages.jsx';
 import { downloadConfirmedGuests } from './exportConfirmedGuests.js';
+import { companionsForGuest, confirmedParticipants } from './participantList.js';
 import { createEvent, listHostEvents, saveEvent } from '../event/eventRepository.js';
 import EventEditor from '../event/EventEditor.jsx';
 import SharePanel from '../sharing/SharePanel.jsx';
@@ -118,7 +119,7 @@ export default function HostDashboard({ user }) {
   if (selectedEvent || creating) {
     const guestCounts = {
       pending: management.guests.filter((guest) => guest.status === 'pending').length,
-      confirmed: management.guests.filter((guest) => guest.status === 'confirmed').length,
+      confirmed: confirmedParticipants(management.guests).length,
       declined: management.guests.filter((guest) => guest.status === 'declined').length,
     };
 
@@ -217,7 +218,20 @@ export default function HostDashboard({ user }) {
                         );
                         return (
                           <li className="management-row" key={guest.guestId}>
-                            <div><strong>{guest.name}</strong><span>{label}</span></div>
+                            <div>
+                              <strong>{guest.name}</strong>
+                              <span>{label}</span>
+                              {guest.status === 'confirmed' && companionsForGuest(guest).length > 0 && (
+                                <ul aria-label={`Acompanhantes de ${guest.name}`} className="guest-companion-list">
+                                  {companionsForGuest(guest).map((companion, index) => (
+                                    <li className="guest-companion-row" key={`${guest.guestId}-companion-${index}`}>
+                                      <strong>{companion.name}</strong>
+                                      <span>Acompanhante de {guest.name} · {companion.age} {companion.age === 1 ? 'ano' : 'anos'}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
                             {submission && <EditLinkControls eventId={selectedEvent.id} submission={submission} />}
                           </li>
                         );

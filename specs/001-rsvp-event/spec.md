@@ -184,7 +184,7 @@ Como convidado, quero consultar os detalhes da festa, confirmar ou recusar prese
 
 #### ✅ Feature 6 - Convidado confirma presença
 
-- **Descrição**: O convidado informa o nome cadastrado pelo anfitrião e responde se comparecerá ou não.
+- **Descrição**: O convidado informa o nome cadastrado pelo anfitrião, responde se comparecerá e pode incluir acompanhantes com nome e idade.
 - **Ator**: Convidado.
 - **Fluxo**:
   1. O convidado abre o link público do evento.
@@ -203,6 +203,8 @@ Como convidado, quero consultar os detalhes da festa, confirmar ou recusar prese
   - O sistema rejeita a resposta se o evento não existir, não estiver publicado, o nome estiver ausente ou a opção de RSVP for inválida, sem alterar uma resposta existente.
   - O sistema distingue quem confirmou de quem informou que não comparecerá.
   - Após o envio, o convidado recebe confirmação e acesso privado para editar sua resposta.
+  - Somente quem confirma presença pode informar até 20 acompanhantes; cada nome tem até 100 caracteres e cada idade é inteira entre 0 e 120.
+  - Acompanhantes ficam vinculados ao RSVP principal e não criam respostas ou links de edição independentes.
 
 #### 💬 Feature 7 - Convidado deixa mensagem
 
@@ -235,6 +237,7 @@ Como convidado, quero consultar os detalhes da festa, confirmar ou recusar prese
 - **Critérios de aceitação**:
   - O convidado consegue editar a resposta sem conta ou login.
   - Salvar uma edição atualiza a resposta existente, sem duplicá-la.
+  - Pelo mesmo link, o convidado consegue incluir, editar ou remover acompanhantes; ao recusar presença, os acompanhantes deixam de integrar a resposta.
   - Se o nome for alterado, a resposta volta ao estado de revisão e não altera o estado de nenhum convidado até o anfitrião resolver a associação.
   - O anfitrião vê a resposta atualizada na lista do evento.
   - Um acesso inválido ou destinado a outra resposta não permite consultar ou editar os dados.
@@ -250,12 +253,12 @@ Como anfitrião, quero cadastrar convidados e acompanhar quem está pendente, qu
 
 **Acceptance Scenarios**:
 
-1. **Given** que o anfitrião cadastrou convidados e alguns responderam, **When** abre a área de gestão, **Then** encontra grupos visuais de pendentes, confirmados e recusados, além das mensagens atualizadas.
-2. **Given** que há convidados confirmados, **When** o anfitrião exporta a lista, **Then** recebe um arquivo CSV com os confirmados do evento e sem mensagens privadas.
+1. **Given** que o anfitrião cadastrou convidados e alguns responderam, **When** abre a área de gestão, **Then** encontra grupos visuais de pendentes, confirmados e recusados, além das mensagens atualizadas; cada acompanhante confirmado conta como participante adicional.
+2. **Given** que há participantes confirmados, **When** o anfitrião exporta a lista, **Then** recebe um arquivo CSV com uma linha por participante e sem mensagens privadas.
 
 #### 📋 Feature 9 - Anfitrião cadastra convidados e acompanha respostas
 
-- **Descrição**: O anfitrião cadastra os convidados esperados e acompanha visualmente quem ainda está pendente, quem confirmou, quem recusou e as mensagens recebidas.
+- **Descrição**: O anfitrião cadastra os convidados esperados e acompanha visualmente quem ainda está pendente, quem confirmou, quem recusou e as mensagens recebidas. Acompanhantes aparecem sob o convidado principal, com nome e idade.
 - **Ator**: Anfitrião.
 - **Fluxo**:
   1. O anfitrião abre a área privada de gestão do evento.
@@ -291,6 +294,7 @@ Como anfitrião, quero cadastrar convidados e acompanhar quem está pendente, qu
   - O anfitrião consegue cadastrar convidados esperados; cada novo convidado começa com estado pendente.
   - O sistema permite no máximo 100 convidados cadastrados por evento e informa o limite ao anfitrião.
   - O anfitrião consegue consultar os convidados cadastrados separados entre pendentes, confirmados e recusados.
+  - Cada acompanhante aparece como participante adicional sob o RSVP principal e soma um ao total de confirmados; pendentes e recusados continuam contando somente os convidados cadastrados.
   - Uma resposta recebida atualiza o estado do convidado correspondente; quem não respondeu permanece pendente.
   - O anfitrião consegue associar manualmente uma resposta ao convidado correto quando nomes cadastrados forem duplicados.
   - Uma resposta com nome duplicado não altera o estado de um convidado até que o anfitrião resolva a associação.
@@ -303,7 +307,7 @@ Como anfitrião, quero cadastrar convidados e acompanhar quem está pendente, qu
 
 #### 📤 Feature 10 - Anfitrião exporta a lista em CSV
 
-- **Descrição**: O anfitrião baixa a lista de confirmados do evento em formato CSV.
+- **Descrição**: O anfitrião baixa a lista de participantes confirmados do evento em formato CSV, com uma linha para cada convidado principal e cada acompanhante.
 - **Ator**: Anfitrião.
 - **Fluxo**:
   1. O anfitrião abre a área de gestão do evento.
@@ -311,8 +315,8 @@ Como anfitrião, quero cadastrar convidados e acompanhar quem está pendente, qu
   3. Recebe um arquivo CSV que pode abrir em uma ferramenta compatível com planilhas.
 - **Tela esperada**: Ação “Exportar confirmados (CSV)” junto da lista de presença; após a solicitação, o navegador disponibiliza o arquivo.
 - **Critérios de aceitação**:
-  - O CSV inclui todos e somente os convidados confirmados do evento selecionado.
-  - O arquivo identifica o nome do convidado, a situação da resposta e a data da última resposta.
+  - O CSV inclui todos e somente os participantes confirmados do evento selecionado, incluindo acompanhantes.
+  - O arquivo identifica nome, idade dos acompanhantes, convidado principal, situação da resposta e data da última resposta.
   - O arquivo preserva acentos e caracteres especiais dos nomes.
   - Mensagens privadas e respostas negativas não são incluídas na exportação de confirmados.
   - Se não houver confirmados, o anfitrião recebe um arquivo válido vazio ou uma mensagem clara de que não há dados para exportar.

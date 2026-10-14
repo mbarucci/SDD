@@ -418,6 +418,37 @@ textarea {
   padding: 8px 12px;
 }
 
+.guest-companion-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guest-companion-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.companion-fieldset > p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.companion-fields {
+  display: grid;
+  gap: 8px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.companion-fields label {
+  margin-top: 4px;
+}
+
 .message-row {
   display: block;
 }

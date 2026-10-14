@@ -37,6 +37,7 @@ function inboxRecord(submission, changes) {
     message: submission.message,
     updatedAt: submission.updatedAt,
     status: submission.status,
+    companions: submission.companions?.length ? submission.companions : null,
     ...changes,
     token: submission.token,
   };
@@ -162,6 +163,7 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
           updatedAt: null,
           decision: null,
         };
+        delete pendingGuest.companions;
         nextGuests.set(priorGuestId, pendingGuest);
           writes[guestSlotPath(eventId, previousGuest.slot)] = storedGuest(pendingGuest);
       }
@@ -171,8 +173,16 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
     if (submission.status === 'matched') {
       const matchedGuest = nextGuests.get(submission.guestId);
       if (!matchedGuest || matchedGuest.submissionId !== submission.submissionId) continue;
-      if (matchedGuest.status !== submission.decision || matchedGuest.updatedAt !== submission.updatedAt) {
+      const currentCompanions = JSON.stringify(matchedGuest.companions ?? []);
+      const nextCompanions = JSON.stringify(submission.companions ?? []);
+      if (
+        matchedGuest.status !== submission.decision
+        || matchedGuest.updatedAt !== submission.updatedAt
+        || currentCompanions !== nextCompanions
+      ) {
         const updatedGuest = { ...matchedGuest, status: submission.decision, updatedAt: submission.updatedAt };
+        if (submission.companions?.length) updatedGuest.companions = submission.companions;
+        else delete updatedGuest.companions;
         nextGuests.set(updatedGuest.guestId, updatedGuest);
           writes[guestSlotPath(eventId, updatedGuest.slot)] = storedGuest(updatedGuest);
       }
@@ -205,6 +215,8 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
       updatedAt: submission.updatedAt,
       decision: submission.decision,
     };
+    if (submission.companions?.length) updatedGuest.companions = submission.companions;
+    else delete updatedGuest.companions;
     const updatedSubmission = capabilityRecord(submission, { status: 'matched', guestId: guest.guestId });
     nextGuests.set(updatedGuest.guestId, updatedGuest);
       writes[guestSlotPath(eventId, guest.slot)] = storedGuest(updatedGuest);
@@ -220,14 +232,18 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
 
 export async function associateInboxSubmission(eventId, submission, guest) {
   const db = database();
+  const associatedGuest = {
+    ...storedGuest(guest),
+    status: submission.decision,
+    submissionId: submission.submissionId,
+    updatedAt: submission.updatedAt,
+    decision: submission.decision,
+  };
+  if (submission.companions?.length) associatedGuest.companions = submission.companions;
+  else delete associatedGuest.companions;
+
   const writes = {
-    [guestSlotPath(eventId, guest.slot)]: {
-      ...storedGuest(guest),
-      status: submission.decision,
-      submissionId: submission.submissionId,
-      updatedAt: submission.updatedAt,
-      decision: submission.decision,
-    },
+    [guestSlotPath(eventId, guest.slot)]: associatedGuest,
     [editCapabilityPath(submission.token)]: capabilityRecord(submission, {
       status: 'matched',
       guestId: guest.guestId,
@@ -243,13 +259,15 @@ export async function associateInboxSubmission(eventId, submission, guest) {
   if (submission.previousGuestId && submission.previousGuestId !== guest.guestId) {
     const previousGuest = await getGuestById(eventId, submission.previousGuestId);
     if (previousGuest?.submissionId === submission.submissionId) {
-      writes[guestSlotPath(eventId, previousGuest.slot)] = {
+      const pendingGuest = {
         ...storedGuest(previousGuest),
         status: 'pending',
         submissionId: null,
         updatedAt: null,
         decision: null,
       };
+      delete pendingGuest.companions;
+      writes[guestSlotPath(eventId, previousGuest.slot)] = pendingGuest;
     }
   }
 

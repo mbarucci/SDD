@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { submitRsvp } from './rsvpSubmissionService.js';
+import CompanionFields from './CompanionFields.jsx';
 
 export default function GuestRsvpForm({ eventId }) {
   const [name, setName] = useState('');
   const [decision, setDecision] = useState('');
   const [message, setMessage] = useState('');
+  const [companions, setCompanions] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [editUrl, setEditUrl] = useState('');
@@ -14,7 +16,13 @@ export default function GuestRsvpForm({ eventId }) {
     setError('');
     setBusy(true);
     try {
-      const submission = await submitRsvp({ eventId, name, decision, message });
+      const submission = await submitRsvp({
+        eventId,
+        name,
+        decision,
+        message,
+        companions: decision === 'confirmed' ? companions : [],
+      });
       setEditUrl(`/edit/${submission.token}`);
     } catch (submitError) {
       setError(submitError.message || 'Não foi possível enviar sua resposta. Tente novamente.');
@@ -45,6 +53,9 @@ export default function GuestRsvpForm({ eventId }) {
           <label><input checked={decision === 'confirmed'} name="decision" onChange={() => setDecision('confirmed')} required type="radio" value="confirmed" /> Vou comparecer</label>
           <label><input checked={decision === 'declined'} name="decision" onChange={() => setDecision('declined')} type="radio" value="declined" /> Não poderei ir</label>
         </fieldset>
+        {decision === 'confirmed' && (
+          <CompanionFields companions={companions} idPrefix="guest" onChange={setCompanions} />
+        )}
         <label htmlFor="guest-message">Mensagem ao anfitrião</label>
         <textarea id="guest-message" maxLength={500} onChange={(event) => setMessage(event.target.value)} rows="3" value={message} />
         <p className="character-count">{message.length}/500</p>
