@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+.firebase/
+.superpowers/
+.env*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
