@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { createDraftEvent, registerHost } from './helpers.js';
 
 test('host reviews duplicate RSVP, reads its private message, and finds inbox after reopening', async ({ page, browser }) => {
@@ -34,10 +35,18 @@ test('host reviews duplicate RSVP, reads its private message, and finds inbox af
   await page.getByRole('button', { name: 'Convidados' }).click();
   await expect(page.getByText('Revisão necessária')).toBeVisible({ timeout: 5000 });
   await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Pendentes: 2');
+  const inboxCompanions = page.getByRole('list', { name: 'Acompanhantes de Alex Silva' });
+  await expect(inboxCompanions).toContainText('Bento Silva');
+  await expect(inboxCompanions).toContainText('7 anos');
+  await expect(inboxCompanions).toContainText('Cecília Silva');
+  await expect(inboxCompanions).toContainText('35 anos');
   await page.getByLabel('Associar resposta de Alex Silva').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Associar resposta' }).click();
   await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Confirmados: 3');
   await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Pendentes: 1');
+  const rosterCompanions = page.getByRole('list', { name: 'Acompanhantes de Alex Silva' });
+  await expect(rosterCompanions).toContainText('Bento Silva');
+  await expect(rosterCompanions).toContainText('7 anos');
   await expect(page.getByText('Bento Silva')).toBeVisible();
   await expect(page.getByText('7 anos')).toBeVisible();
   await expect(page.getByText('Cecília Silva')).toBeVisible();
@@ -46,6 +55,10 @@ test('host reviews duplicate RSVP, reads its private message, and finds inbox af
   await page.getByRole('button', { name: 'Exportar confirmados (CSV)' }).first().click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('convidados-confirmados.csv');
+  const csv = await readFile(await download.path(), 'utf8');
+  expect(csv).toContain('"Alex Silva","","","Confirmado"');
+  expect(csv).toContain('"Bento Silva","7","Alex Silva","Confirmado"');
+  expect(csv).toContain('"Cecília Silva","35","Alex Silva","Confirmado"');
 
   await page.getByRole('button', { name: 'Mensagens' }).click();
   await expect(page.getByText('Preciso de opção vegetariana.')).toBeVisible();

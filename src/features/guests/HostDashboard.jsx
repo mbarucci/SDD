@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { associateInboxSubmission, addExpectedGuest, deleteInboxSubmission, listenToEventManagement, reconcileEventInbox } from './guestRepository.js';
 import EditLinkControls from './EditLinkControls.jsx';
 import InboxReview from './InboxReview.jsx';
+import CompanionList from './CompanionList.jsx';
 import HostMessages from './HostMessages.jsx';
 import { downloadConfirmedGuests } from './exportConfirmedGuests.js';
-import { companionsForGuest, confirmedParticipants } from './participantList.js';
+import { confirmedParticipants } from './participantList.js';
 import { createEvent, listHostEvents, saveEvent } from '../event/eventRepository.js';
 import EventEditor from '../event/EventEditor.jsx';
 import SharePanel from '../sharing/SharePanel.jsx';
@@ -221,16 +222,7 @@ export default function HostDashboard({ user }) {
                             <div>
                               <strong>{guest.name}</strong>
                               <span>{label}</span>
-                              {guest.status === 'confirmed' && companionsForGuest(guest).length > 0 && (
-                                <ul aria-label={`Acompanhantes de ${guest.name}`} className="guest-companion-list">
-                                  {companionsForGuest(guest).map((companion, index) => (
-                                    <li className="guest-companion-row" key={`${guest.guestId}-companion-${index}`}>
-                                      <strong>{companion.name}</strong>
-                                      <span>Acompanhante de {guest.name} · {companion.age} {companion.age === 1 ? 'ano' : 'anos'}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
+                              {guest.status === 'confirmed' && <CompanionList guest={guest} />}
                             </div>
                             {submission && <EditLinkControls eventId={selectedEvent.id} submission={submission} />}
                           </li>

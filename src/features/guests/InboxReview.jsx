@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CompanionList from './CompanionList.jsx';
 
 function reviewLabel(submission) {
   if (submission.reviewRequired || submission.status === 'duplicate-review') return 'Revisão necessária';
@@ -28,6 +29,7 @@ export default function InboxReview({ guests, onAssociate, onDelete, submissions
                 <strong>{submission.name}</strong>
                 <span>{reviewLabel(submission)} · {submission.decision === 'confirmed' ? 'Confirmou presença' : 'Não poderá comparecer'}</span>
                 {submission.message && <p>{submission.message}</p>}
+                {submission.decision === 'confirmed' && <CompanionList guest={submission} />}
               </div>
               <div className="management-row-actions">
                 <label className="visually-hidden" htmlFor={`associate-${submission.submissionId}`}>
