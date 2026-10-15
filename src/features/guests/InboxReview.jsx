@@ -7,27 +7,36 @@ function reviewLabel(submission) {
   return 'Associada';
 }
 
-export default function InboxReview({ guests, onAssociate, onDelete, submissions }) {
+export default function InboxReview({ guests, onAssociate, onDelete, onDetach, submissions }) {
   const [selectedGuests, setSelectedGuests] = useState({});
-  const pendingSubmissions = submissions.filter(
-    (submission) => submission.status !== 'matched' || submission.reviewRequired,
-  );
+  const [saving, setSaving] = useState(false);
+  async function perform(action) {
+    setSaving(true);
+    try {
+      await action();
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <section className="management-section" aria-labelledby="inbox-title">
       <div className="section-heading">
-        <h2 id="inbox-title">Respostas para revisar</h2>
-        <span>{pendingSubmissions.length}</span>
+        <h2 id="inbox-title">Respostas recebidas</h2>
+        <span>{submissions.length}</span>
       </div>
-      {pendingSubmissions.length === 0 ? (
-        <p className="management-empty">Nenhuma resposta aguarda revisão.</p>
+      {submissions.length === 0 ? (
+        <p className="management-empty">Nenhuma resposta recebida.</p>
       ) : (
         <ul className="management-list">
-          {pendingSubmissions.map((submission) => (
+          {submissions.map((submission) => (
             <li className="management-row" key={submission.submissionId}>
               <div>
                 <strong>{submission.name}</strong>
                 <span>{reviewLabel(submission)} · {submission.decision === 'confirmed' ? 'Confirmou presença' : 'Não poderá comparecer'}</span>
+                {submission.status === 'matched' && (
+                  <p>Convidado associado: {guests.find((guest) => guest.guestId === submission.guestId)?.name ?? 'Cadastro indisponível'}</p>
+                )}
                 {submission.message && <p>{submission.message}</p>}
                 {submission.decision === 'confirmed' && <CompanionList guest={submission} />}
               </div>
@@ -37,27 +46,37 @@ export default function InboxReview({ guests, onAssociate, onDelete, submissions
                 </label>
                 <select
                   id={`associate-${submission.submissionId}`}
+                  disabled={saving}
                   onChange={(event) => setSelectedGuests((current) => ({
                     ...current,
                     [submission.submissionId]: event.target.value,
                   }))}
-                  value={selectedGuests[submission.submissionId] ?? ''}
+                  value={selectedGuests[submission.submissionId] ?? submission.guestId ?? ''}
                 >
                   <option value="">Selecionar convidado</option>
                   {guests.map((guest, index) => (
-                    <option key={guest.guestId} value={guest.guestId}>
+                    <option
+                      disabled={Boolean(guest.submissionId && guest.submissionId !== submission.submissionId)}
+                      key={guest.guestId}
+                      value={guest.guestId}
+                    >
                       {guest.name}{guests.filter((item) => item.normalizedName === guest.normalizedName).length > 1 ? ` · ${index + 1}` : ''}
                     </option>
                   ))}
                 </select>
                 <button
                   className="secondary-button"
-                  disabled={!selectedGuests[submission.submissionId]}
-                  onClick={() => onAssociate(submission, selectedGuests[submission.submissionId])}
+                  disabled={saving || !selectedGuests[submission.submissionId] || selectedGuests[submission.submissionId] === submission.guestId}
+                  onClick={() => perform(() => onAssociate(submission, selectedGuests[submission.submissionId]))}
                   type="button"
-                >Associar resposta</button>
+                >{submission.status === 'matched' ? 'Trocar associação' : 'Associar resposta'}</button>
+                {submission.status === 'matched' && (
+                  <button className="text-button" disabled={saving} onClick={() => perform(() => onDetach(submission))} type="button">
+                    Desfazer associação
+                  </button>
+                )}
                 {submission.status === 'unmatched' && !submission.reviewRequired && (
-                  <button className="text-button" onClick={() => onDelete(submission)} type="button">Excluir envio</button>
+                  <button className="text-button" disabled={saving} onClick={() => perform(() => onDelete(submission))} type="button">Excluir envio</button>
                 )}
               </div>
             </li>

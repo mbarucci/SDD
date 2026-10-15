@@ -36,6 +36,8 @@ Este modelo é uma proposta para Firebase Realtime Database. Os caminhos exatos 
 
 - `guestId`: ID aleatório estável.
 - `name`: nome cadastrado pelo anfitrião.
+- `phone`: telefone privado opcional de até 40 caracteres, armazenado como texto; aceita dígitos, espaços, `+`, `(`, `)`, `.` e `-`. Pode ser editado ou removido sem alterar o RSVP; ausente nos cadastros antigos.
+- `associationSource`: `automatic` ou `manual`, opcional para compatibilidade com cadastros existentes. Uma associação manual não pode ser substituída por uma nova correspondência automática de outra resposta; o campo é removido ao devolver o cadastro a pendente.
 - `normalizedName`: chave derivada de forma Unicode canônica, caixa ignorada e espaços externos/repetidos removidos; acentos e pontuação são preservados.
 - `status`: `pending`, `confirmed` ou `declined`.
 - `companions`: lista privada opcional de até 20 acompanhantes do RSVP confirmado; cada item contém nome (até 100 caracteres) e idade inteira entre 0 e 120. Cada acompanhante conta como participante confirmado adicional.
@@ -50,6 +52,7 @@ Este modelo é uma proposta para Firebase Realtime Database. Os caminhos exatos 
 - `companions`: lista opcional, permitida somente quando `decision` é `confirmed`, com até 20 itens `{ name, age }`; permanece vinculada a esta submissão e à sua capacidade de edição.
 - `createdAt`: timestamp validado na criação.
 - `guestId`: preenchido pelo cliente autenticado do anfitrião somente depois de associação autorizada; duplicatas aguardam resolução manual.
+- `reviewRequired`: ao desfazer uma associação, permanece `true` na capacidade de edição, sem `guestId` nem `previousGuestId`, para impedir nova associação automática. Somente o anfitrião pode liberar essa revisão associando a resposta novamente. O convidado pode continuar editando nome, decisão, mensagem e acompanhantes, mas não pode remover a revisão.
 - `status`: `unmatched`, `matched` ou `duplicate-review` até associação pelo anfitrião.
 - Relação: submissões não associadas ficam na inbox privada, gravável por convidado anônimo e legível somente pelo proprietário autenticado; a fila não expira automaticamente. Após associação, o mesmo registro permanece como RSVP privado, fora da fila pendente.
 

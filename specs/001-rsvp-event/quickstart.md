@@ -47,6 +47,13 @@ npm run build
 
 ## Deploy
 
+Antes do deploy desta atualização, validar também:
+
+- Cadastrar convidado com e sem telefone; editar e remover o número no painel. Confirmar que o RSVP público e o link de edição não expõem o telefone.
+- Enviar RSVP com nome único e acompanhantes; trocar a associação automática para outro cadastro livre. Conferir que resposta e acompanhantes são transferidos, os totais não duplicam e o telefone usado no CSV é o do cadastro destino.
+- Desfazer a associação, recarregar a gestão e editar o RSVP pelo link individual. Confirmar que permanece em revisão até a associação manual; verificar que outro RSVP não substitui uma associação marcada como manual.
+- Baixar CSV e ler o conteúdo: uma linha para cada confirmado e acompanhante, telefone somente na linha do convidado principal, mantendo exportação dos registros antigos sem telefone.
+
 Configure um projeto Firebase no Spark com Authentication por e-mail/senha e Realtime Database. Atualize `.env.local` com a configuração Web pública do projeto e `VITE_USE_FIREBASE_EMULATORS=false`; não publique valores de demonstração. Gere `dist/` com `npm run build` e publique Rules e Hosting com `firebase deploy --project SEU_PROJECT_ID --only database,hosting`. Não vincule billing nem habilite Maps API ou armazenamento de imagens para esta feature.
 
 ## Resultado e limites

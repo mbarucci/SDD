@@ -52,9 +52,25 @@ function makeEditToken() {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function addExpectedGuest(eventId, name) {
+export function normalizePhone(value = '') {
+  const phone = value.trim();
+  if (phone && (phone.length > 40 || !/^[+0-9(). -]+$/.test(phone) || !/[0-9]/.test(phone))) {
+    throw new Error('Informe um telefone válido com até 40 caracteres.');
+  }
+  return phone;
+}
+
+export async function saveGuestPhone(eventId, guest, value) {
+  const phone = normalizePhone(value);
+  await update(ref(database()), {
+    [`${guestSlotPath(eventId, guest.slot)}/phone`]: phone || null,
+  });
+}
+
+export async function addExpectedGuest(eventId, name, phone = '') {
   const displayName = name.trim().replace(/\s+/gu, ' ');
   const normalizedName = normalizeName(displayName);
+  const normalizedPhone = normalizePhone(phone);
   if (!displayName) throw new Error('Informe o nome do convidado.');
   if (displayName.length > 100) throw new Error('O nome deve ter até 100 caracteres.');
 
@@ -67,6 +83,7 @@ export async function addExpectedGuest(eventId, name) {
     normalizedName,
     status: 'pending',
     createdAt: Date.now(),
+    ...(normalizedPhone && { phone: normalizedPhone }),
   };
 
   for (let index = 1; index <= 100; index += 1) {
@@ -164,11 +181,14 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
           decision: null,
         };
         delete pendingGuest.companions;
+        delete pendingGuest.associationSource;
         nextGuests.set(priorGuestId, pendingGuest);
           writes[guestSlotPath(eventId, previousGuest.slot)] = storedGuest(pendingGuest);
       }
       continue;
     }
+
+    if (submission.reviewRequired && submission.status !== 'matched') continue;
 
     if (submission.status === 'matched') {
       const matchedGuest = nextGuests.get(submission.guestId);
@@ -206,6 +226,7 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
     }
 
     const guest = candidates[0];
+    if (guest.associationSource === 'manual' && guest.submissionId !== submission.submissionId) continue;
     if (guest.submissionId && guest.updatedAt >= submission.updatedAt) continue;
 
     const updatedGuest = {
@@ -214,6 +235,7 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
       submissionId: submission.submissionId,
       updatedAt: submission.updatedAt,
       decision: submission.decision,
+      associationSource: 'automatic',
     };
     if (submission.companions?.length) updatedGuest.companions = submission.companions;
     else delete updatedGuest.companions;
@@ -231,9 +253,13 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
 }
 
 export async function associateInboxSubmission(eventId, submission, guest) {
+  if (guest.submissionId && guest.submissionId !== submission.submissionId) {
+    throw new Error('Este convidado já possui outra resposta. Desfaça essa associação primeiro.');
+  }
   const db = database();
   const associatedGuest = {
     ...storedGuest(guest),
+    associationSource: 'manual',
     status: submission.decision,
     submissionId: submission.submissionId,
     updatedAt: submission.updatedAt,
@@ -253,11 +279,14 @@ export async function associateInboxSubmission(eventId, submission, guest) {
     [submissionInboxPath(eventId, submission.inboxKey)]: inboxRecord(submission, {
       status: 'matched',
       guestId: guest.guestId,
+      previousGuestId: null,
+      reviewRequired: null,
     }),
   };
 
-  if (submission.previousGuestId && submission.previousGuestId !== guest.guestId) {
-    const previousGuest = await getGuestById(eventId, submission.previousGuestId);
+  const previousGuestId = submission.guestId ?? submission.previousGuestId;
+  if (previousGuestId && previousGuestId !== guest.guestId) {
+    const previousGuest = await getGuestById(eventId, previousGuestId);
     if (previousGuest?.submissionId === submission.submissionId) {
       const pendingGuest = {
         ...storedGuest(previousGuest),
@@ -267,11 +296,45 @@ export async function associateInboxSubmission(eventId, submission, guest) {
         decision: null,
       };
       delete pendingGuest.companions;
+      delete pendingGuest.associationSource;
       writes[guestSlotPath(eventId, previousGuest.slot)] = pendingGuest;
     }
   }
 
   await update(ref(db), writes);
+}
+
+export async function detachInboxSubmission(eventId, submission) {
+  const changes = {
+    status: 'unmatched',
+    guestId: null,
+    previousGuestId: null,
+    reviewRequired: true,
+  };
+  const writes = {
+    [editCapabilityPath(submission.token)]: capabilityRecord(submission, changes),
+    [submissionInboxPath(eventId, submission.inboxKey)]: inboxRecord(submission, {
+      status: 'unmatched',
+      guestId: null,
+    }),
+  };
+  const previousGuestId = submission.guestId ?? submission.previousGuestId;
+  if (previousGuestId) {
+    const guest = await getGuestById(eventId, previousGuestId);
+    if (guest?.submissionId === submission.submissionId) {
+      const pendingGuest = {
+        ...storedGuest(guest),
+        status: 'pending',
+        submissionId: null,
+        updatedAt: null,
+        decision: null,
+      };
+      delete pendingGuest.companions;
+      delete pendingGuest.associationSource;
+      writes[guestSlotPath(eventId, guest.slot)] = pendingGuest;
+    }
+  }
+  await update(ref(database()), writes);
 }
 
 async function getGuestById(eventId, guestId) {

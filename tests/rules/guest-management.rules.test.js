@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   assertFails,
+  assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { get, ref, remove, set } from 'firebase/database';
@@ -38,6 +39,20 @@ afterAll(async () => {
 });
 
 describe('guest roster limits', () => {
+  it('keeps phone private and validates owner edits without requiring it on old records', async () => {
+    const path = 'privateEvents/published-event/guests/guest-001/phone';
+    const owner = testEnvironment.authenticatedContext('host-one').database();
+    await assertSucceeds(set(ref(owner, path), '+55 (11) 09999-0000'));
+    expect((await get(ref(owner, path))).val()).toBe('+55 (11) 09999-0000');
+    await assertFails(get(ref(testEnvironment.unauthenticatedContext().database(), path)));
+    await assertFails(set(ref(testEnvironment.unauthenticatedContext().database(), path), '11999990000'));
+    await assertFails(set(ref(testEnvironment.authenticatedContext('other-host').database(), path), '11999990000'));
+    await assertFails(set(ref(owner, path), 11999990000));
+    await assertFails(set(ref(owner, path), '1'.repeat(41)));
+    await assertFails(set(ref(owner, path), 'telefone inválido'));
+    await assertFails(set(ref(owner, path), '+()'));
+    await assertSucceeds(remove(ref(owner, path)));
+  });
   it('rejects the 101st guest without changing the existing 100', async () => {
     const ownerDatabase = testEnvironment.authenticatedContext('host-one').database();
     await assertFails(set(ref(ownerDatabase, 'privateEvents/published-event/guests/guest-101'), {

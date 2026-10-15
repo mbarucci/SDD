@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { confirmedGuestsCsv } from '../../src/features/guests/exportConfirmedGuests.js';
 
 describe('confirmedGuestsCsv', () => {
+  it('exports the registered phone only on the principal participant', () => {
+    const rows = confirmedGuestsCsv([{
+      name: 'Alex', status: 'confirmed', phone: '(11) 09999-0000',
+      companions: [{ name: 'Caio', age: 7 }],
+    }]).split('\r\n');
+    expect(rows[0]).toContain('Telefone');
+    expect(rows[1]).toContain('"(11) 09999-0000"');
+    expect(rows[2]).not.toContain('(11) 09999-0000');
+  });
   it('exports only confirmed names and excludes private messages', () => {
     const csv = confirmedGuestsCsv([
       { name: 'José, Jr.', status: 'confirmed', updatedAt: 1710000000000, message: 'informação privada', companions: [{ name: 'Sofia', age: 7 }] },
@@ -9,13 +18,13 @@ describe('confirmedGuestsCsv', () => {
       { name: 'Mário', status: 'confirmed', updatedAt: 1710000002000, message: '' },
     ]);
 
-    expect(csv).toBe('\uFEFFNome,Idade,Convidado principal,Situação,Data da última resposta\r\n"José, Jr.","","","Confirmado","2024-03-09T16:00:00.000Z"\r\n"Sofia","7","José, Jr.","Confirmado","2024-03-09T16:00:00.000Z"\r\n"Mário","","","Confirmado","2024-03-09T16:00:02.000Z"');
+    expect(csv).toBe('\uFEFFNome,Idade,Telefone,Convidado principal,Situação,Data da última resposta\r\n"José, Jr.","","","","Confirmado","2024-03-09T16:00:00.000Z"\r\n"Sofia","7","","José, Jr.","Confirmado","2024-03-09T16:00:00.000Z"\r\n"Mário","","","","Confirmado","2024-03-09T16:00:02.000Z"');
     expect(csv).not.toContain('privada');
     expect(csv).not.toContain('Ana');
   });
 
   it('escapes quotes in names and retains accented characters', () => {
     expect(confirmedGuestsCsv([{ name: 'D\'Ávila "Duda"', status: 'confirmed', updatedAt: 1710000000000 }]))
-      .toBe('\uFEFFNome,Idade,Convidado principal,Situação,Data da última resposta\r\n"D\'Ávila ""Duda""","","","Confirmado","2024-03-09T16:00:00.000Z"');
+      .toBe('\uFEFFNome,Idade,Telefone,Convidado principal,Situação,Data da última resposta\r\n"D\'Ávila ""Duda""","","","","Confirmado","2024-03-09T16:00:00.000Z"');
   });
 });

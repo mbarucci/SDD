@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { associateInboxSubmission, addExpectedGuest, deleteInboxSubmission, listenToEventManagement, reconcileEventInbox } from './guestRepository.js';
+import { associateInboxSubmission, addExpectedGuest, deleteInboxSubmission, detachInboxSubmission, listenToEventManagement, reconcileEventInbox, saveGuestPhone } from './guestRepository.js';
+import GuestPhoneEditor from './GuestPhoneEditor.jsx';
 import EditLinkControls from './EditLinkControls.jsx';
 import InboxReview from './InboxReview.jsx';
 import CompanionList from './CompanionList.jsx';
@@ -19,6 +20,7 @@ export default function HostDashboard({ user }) {
   const [managementError, setManagementError] = useState('');
   const [guestNotice, setGuestNotice] = useState('');
   const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
   const [savingGuest, setSavingGuest] = useState(false);
   const [management, setManagement] = useState({ guests: [], submissions: [] });
 
@@ -81,8 +83,9 @@ export default function HostDashboard({ user }) {
     setManagementError('');
     setGuestNotice('');
     try {
-      await addExpectedGuest(selectedEvent.id, guestName);
+      await addExpectedGuest(selectedEvent.id, guestName, guestPhone);
       setGuestName('');
+      setGuestPhone('');
       setGuestNotice('Convidado cadastrado.');
     } catch (error) {
       setManagementError(error.message || 'Não foi possível cadastrar o convidado. Tente novamente.');
@@ -93,12 +96,35 @@ export default function HostDashboard({ user }) {
 
   async function associateSubmission(submission, guestId) {
     const guest = management.guests.find((item) => item.guestId === guestId);
-    if (!guest) return;
+    if (!guest) {
+      setManagementError('Convidado não encontrado. Atualize a lista e tente novamente.');
+      return;
+    }
     try {
       await associateInboxSubmission(selectedEvent.id, submission, guest);
       setManagementError('');
+    } catch (error) {
+      setManagementError(error.message || 'Não foi possível associar a resposta. Tente novamente.');
+    }
+  }
+
+  async function detachSubmission(submission) {
+    try {
+      await detachInboxSubmission(selectedEvent.id, submission);
+      setManagementError('');
     } catch {
-      setManagementError('Não foi possível associar a resposta. Tente novamente.');
+      setManagementError('Não foi possível desfazer a associação. Tente novamente.');
+    }
+  }
+
+  async function updatePhone(guest, phone) {
+    try {
+      await saveGuestPhone(selectedEvent.id, guest, phone);
+      setManagementError('');
+      return true;
+    } catch (error) {
+      setManagementError(error.message || 'Não foi possível salvar o telefone. Tente novamente.');
+      return false;
     }
   }
 
@@ -184,16 +210,30 @@ export default function HostDashboard({ user }) {
             <p className="guest-limit">{management.guests.length} de 100 convidados</p>
             {management.guests.length >= 100 && <p>Limite de 100 convidados atingido.</p>}
             <form className="guest-add-form" onSubmit={addGuest}>
-              <label htmlFor="expected-guest-name">Nome do convidado</label>
-              <div className="guest-add-row">
-                <input
-                  disabled={savingGuest}
-                  id="expected-guest-name"
-                  maxLength={100}
-                  onChange={(event) => setGuestName(event.target.value)}
-                  required
-                  value={guestName}
-                />
+              <div className="guest-registration-fields">
+                <div>
+                  <label htmlFor="expected-guest-name">Nome do convidado</label>
+                  <input
+                    disabled={savingGuest}
+                    id="expected-guest-name"
+                    maxLength={100}
+                    onChange={(event) => setGuestName(event.target.value)}
+                    required
+                    value={guestName}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="expected-guest-phone">Telefone (opcional)</label>
+                  <input
+                    autoComplete="tel"
+                    disabled={savingGuest}
+                    id="expected-guest-phone"
+                    maxLength={40}
+                    onChange={(event) => setGuestPhone(event.target.value)}
+                    type="tel"
+                    value={guestPhone}
+                  />
+                </div>
                 <button className="primary-button" disabled={savingGuest || management.guests.length >= 100} type="submit">
                   {savingGuest ? 'Salvando...' : 'Adicionar convidado'}
                 </button>
@@ -222,6 +262,7 @@ export default function HostDashboard({ user }) {
                             <div>
                               <strong>{guest.name}</strong>
                               <span>{label}</span>
+                              <GuestPhoneEditor guest={guest} onSave={updatePhone} />
                               {guest.status === 'confirmed' && <CompanionList guest={guest} />}
                             </div>
                             {submission && <EditLinkControls eventId={selectedEvent.id} submission={submission} />}
@@ -238,6 +279,7 @@ export default function HostDashboard({ user }) {
               guests={management.guests}
               onAssociate={associateSubmission}
               onDelete={deleteSubmission}
+              onDetach={detachSubmission}
               submissions={management.submissions}
             />
           </section>

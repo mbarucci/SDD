@@ -31,6 +31,9 @@ Este contrato especifica fronteiras de autorização para o SDK Web. Não define
 - Exigir `auth != null` e igualdade entre `auth.uid` e o proprietário persistido.
 - Aplicar a mesma checagem para leitura e escrita de convidados, respostas, mensagens e exportação.
 - Negar acesso de outro anfitrião mesmo que conheça `eventId`.
+- Permitir telefone opcional somente no cadastro privado (`guests/{slot}/phone`), como texto de até 40 caracteres com dígitos e pontuação telefônica; negar leitura/escrita anônima e de outro proprietário. Não replicar telefone na inbox, capacidade de edição ou evento público.
+- Registrar `associationSource` no cadastro como `manual` ou `automatic`. Correções administrativas usam gravação multipath para mover a resposta e acompanhantes e liberar o cadastro anterior sem duplicação; um cadastro ocupado por outra resposta exige desfazimento prévio.
+- Ao desfazer, manter `reviewRequired: true` na capacidade, com estado `unmatched`; o processamento automático ignora essa resposta e o convidado não pode remover a revisão pelo token. A inbox privada mantém somente os campos do seu schema, sem duplicar a flag.
 
 ### Submeter RSVP à inbox privada
 

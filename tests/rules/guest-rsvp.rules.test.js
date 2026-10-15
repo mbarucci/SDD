@@ -198,6 +198,23 @@ describe('anonymous RSVP rules', () => {
     await assertFails(set(ref(guestDatabase, tokenPath), capability));
   });
 
+  it('does not let a guest cancel review requested by the administrator', async () => {
+    const guestDatabase = testEnvironment.unauthenticatedContext().database();
+    const tokenPath = 'publicEditCapabilities/4123456789012345678901234567890123456789012';
+    const held = {
+      eventId: 'published-event', submissionId: 'held-response', name: 'Helena',
+      decision: 'confirmed', message: '', createdAt: 100, updatedAt: 100,
+      status: 'unmatched', reviewRequired: true,
+    };
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await set(ref(context.database(), tokenPath), held);
+    });
+    await assertSucceeds(set(ref(guestDatabase, tokenPath), { ...held, updatedAt: 101, message: 'Nova mensagem' }));
+    const { reviewRequired, ...withoutReview } = held;
+    await assertFails(set(ref(guestDatabase, tokenPath), { ...withoutReview, updatedAt: 102 }));
+    await assertFails(set(ref(guestDatabase, tokenPath), { ...withoutReview, name: 'Helena Costa', updatedAt: 103 }));
+  });
+
   it('puts a renamed RSVP back into review without changing its former guest', async () => {
     const guestDatabase = testEnvironment.unauthenticatedContext().database();
     const tokenPath = 'publicEditCapabilities/2123456789012345678901234567890123456789012';

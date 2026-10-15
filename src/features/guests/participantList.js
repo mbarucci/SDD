@@ -6,10 +6,11 @@ export function companionsForGuest(guest) {
 
 export function participantsForGuest(guest) {
   return [
-    { name: guest.name, age: '', companionOf: '', updatedAt: guest.updatedAt },
+    { name: guest.name, age: '', phone: guest.phone ?? '', companionOf: '', updatedAt: guest.updatedAt },
     ...companionsForGuest(guest).map((companion) => ({
       name: companion.name,
       age: companion.age,
+      phone: '',
       companionOf: guest.name,
       updatedAt: guest.updatedAt,
     })),

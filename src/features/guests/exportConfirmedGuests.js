@@ -9,11 +9,12 @@ export function confirmedGuestsCsv(guests) {
     .map((participant) => [
       csvField(participant.name),
       csvField(participant.age),
+      csvField(participant.phone),
       csvField(participant.companionOf),
       csvField('Confirmado'),
       csvField(participant.updatedAt ? new Date(participant.updatedAt).toISOString() : ''),
     ].join(','));
-  return [`\uFEFFNome,Idade,Convidado principal,Situação,Data da última resposta`, ...confirmedRows].join('\r\n');
+  return [`\uFEFFNome,Idade,Telefone,Convidado principal,Situação,Data da última resposta`, ...confirmedRows].join('\r\n');
 }
 
 export function downloadConfirmedGuests(guests, filename = 'convidados-confirmados.csv') {
