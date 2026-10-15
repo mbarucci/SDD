@@ -41,6 +41,8 @@ Este modelo é uma proposta para Firebase Realtime Database. Os caminhos exatos 
 - `normalizedName`: chave derivada de forma Unicode canônica, caixa ignorada e espaços externos/repetidos removidos; acentos e pontuação são preservados.
 - `status`: `pending`, `confirmed` ou `declined`.
 - `companions`: lista privada opcional de até 20 acompanhantes do RSVP confirmado; cada item contém nome (até 100 caracteres) e idade inteira entre 0 e 120. Cada acompanhante conta como participante confirmado adicional.
+- `guestRole`: `companion` para um cadastro preexistente vinculado como acompanhante; esse registro herda o estado do RSVP principal e não é contado como resposta independente.
+- `companionOfGuestId`, `companionOfSubmissionId`, `companionAge`: relação privada com o convidado e a submissão principais e idade informada no RSVP. Só uma correspondência única com cadastro pendente é vinculada automaticamente.
 - Relação: uma resposta associada; nomes duplicados exigem resolução pelo anfitrião.
 
 Importações criam somente entidades de convidado cadastrado, sem persistir o arquivo ou a prévia. A chave de deduplicação combina o nome normalizado e os dígitos do telefone; ausência de telefone equivale a uma string vazia. O roster é gravado por transação para preservar alterações concorrentes e verificar as vagas disponíveis, mantendo os slots `guest-001` a `guest-100`. Cada registro novo recebe ID próprio, estado pendente e data de criação.
@@ -62,7 +64,8 @@ Importações criam somente entidades de convidado cadastrado, sem persistir o a
 
 - `token`: segredo aleatório de alta entropia, usado como capacidade bearer para uma única resposta.
 - `submissionId`: resposta que essa capacidade autoriza editar.
-- `companions`: acompanhantes da resposta, atualizados pelo mesmo token e removidos quando a resposta é recusada ou a lista é esvaziada.
+- `companions`: acompanhantes da resposta, atualizados pelo mesmo token e removidos da lista ativa quando a resposta é recusada ou a lista é esvaziada.
+- `previousCompanions`: cópia privada temporária da lista antes de uma recusa, restaurada se a resposta for reconfirmada sem edição da lista; permite sincronizar cadastros de acompanhantes já vinculados sem devolvê-los a pendente.
 - `revokedAt`: timestamp opcional de revogação pelo anfitrião; tokens não expiram automaticamente.
 - Rotação: emitir novo token revoga o anterior; não há reenvio automatizado.
 - Qualquer pessoa que obtenha o token poderá agir como o convidado daquela resposta; o token não comprova identidade.
@@ -74,7 +77,7 @@ Importações criam somente entidades de convidado cadastrado, sem persistir o a
 - Nome inexistente ou duplicado não deve alterar o estado de um convidado antes da resolução pelo anfitrião; envios não associados ficam na inbox até ação manual, sem expiração automática.
 - Ao associar uma submissão, o anfitrião altera o estado do mesmo registro e o RSVP continua privado; não é necessária cópia para outro caminho.
 - Uma edição com capacidade válida atualiza a resposta existente, não cria duplicata.
-- Acompanhantes são associados ao RSVP principal, copiados para o registro privado do convidado após associação e removidos da projeção quando a resposta deixa de ser confirmada.
+- Acompanhantes são associados ao RSVP principal; uma correspondência única com cadastro pendente cria um vínculo privado. Os cadastros vinculados herdam confirmação/recusa, são agrupados sob o principal e não aparecem como pendentes ou respostas independentes. A recusa remove os acompanhantes da lista ativa, mas mantém seus vínculos para herança de estado e eventual reconfirmação.
 - Renomear uma resposta coloca a associação em revisão; nenhum convidado muda de estado até o anfitrião resolver a nova associação.
 - Reenvios pelo formulário público recebem IDs independentes; depois de associados, a submissão aceita mais recentemente define o estado do convidado. Edições pelo mesmo token atualizam um registro e a última gravação aceita prevalece.
 
@@ -104,6 +107,7 @@ publicEditCapabilities/{token}
   eventId
   submissionId
   companions/{index} -> name, age
+  previousCompanions/{index} -> name, age
   revokedAt
 ```
 

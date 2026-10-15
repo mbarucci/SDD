@@ -31,6 +31,14 @@ describe('associateInboxSubmission', () => {
           updatedAt: 1234,
           companions: [{ name: 'Caio', age: 7 }],
         },
+        'guest-002': {
+          guestId: 'new-guest',
+          name: 'Beatriz Lima',
+          normalizedName: 'beatriz lima',
+          status: 'pending',
+          phone: '+55 (11) 99999-0000',
+          companions: [{ name: 'João', age: 8 }],
+        },
       }),
     });
 

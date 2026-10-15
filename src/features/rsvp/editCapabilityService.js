@@ -14,7 +14,10 @@ export async function saveEditCapability(capability, fields) {
   const { token, ...record } = capability;
   const name = fields.name.trim();
   const message = fields.message.trim();
-  const companions = normalizeCompanions(fields.companions ?? [], fields.decision);
+  const submittedCompanions = normalizeCompanions(fields.companions ?? [], fields.decision);
+  const companions = fields.decision === 'confirmed' && submittedCompanions.length === 0
+    ? capability.previousCompanions ?? []
+    : submittedCompanions;
   if (!name) throw new Error('Informe seu nome.');
   if (!['confirmed', 'declined'].includes(fields.decision)) throw new Error('Escolha uma opção de resposta.');
   if (message.length > 500) throw new Error('A mensagem deve ter até 500 caracteres.');
@@ -28,6 +31,11 @@ export async function saveEditCapability(capability, fields) {
     ...(companions.length > 0 && { companions }),
   };
   if (companions.length === 0) delete updated.companions;
+  if (fields.decision === 'declined' && capability.companions?.length) {
+    updated.previousCompanions = capability.companions;
+  } else if (fields.decision === 'confirmed') {
+    delete updated.previousCompanions;
+  }
   if (name !== capability.name) {
     updated.status = 'unmatched';
     const previousGuestId = capability.guestId ?? capability.previousGuestId;

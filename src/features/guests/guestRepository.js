@@ -56,6 +56,99 @@ function makeEditToken() {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function writeRosterGuest(eventId, guests, writes, guest) {
+  guests.set(guest.guestId, guest);
+  writes[guestSlotPath(eventId, guest.slot)] = storedGuest(guest);
+}
+
+function releaseLinkedCompanions(eventId, submissionId, guests, writes) {
+  for (const guest of guests.values()) {
+    if (guest.guestRole !== 'companion' || guest.companionOfSubmissionId !== submissionId) continue;
+    const pendingGuest = { ...guest, status: 'pending', decision: null };
+    delete pendingGuest.guestRole;
+    delete pendingGuest.companionOfGuestId;
+    delete pendingGuest.companionOfSubmissionId;
+    delete pendingGuest.companionAge;
+    writeRosterGuest(eventId, guests, writes, pendingGuest);
+  }
+}
+
+function syncLinkedCompanions(eventId, submission, parent, guests, writes) {
+  const linked = [...guests.values()].filter(
+    (guest) => guest.guestRole === 'companion' && guest.companionOfSubmissionId === submission.submissionId,
+  );
+  if (submission.decision === 'declined') {
+    for (const guest of linked) {
+      if (guest.status !== 'declined' || guest.companionOfGuestId !== parent.guestId) {
+        writeRosterGuest(eventId, guests, writes, {
+          ...guest,
+          status: 'declined',
+          decision: 'declined',
+          companionOfGuestId: parent.guestId,
+        });
+      }
+    }
+    return;
+  }
+
+  const companions = Array.isArray(submission.companions)
+    ? submission.companions
+    : Object.values(submission.companions ?? {});
+  const returningFromDeclined = linked.some((guest) => guest.decision === 'declined');
+  if (companions.length === 0 && returningFromDeclined) {
+    for (const guest of linked) {
+      writeRosterGuest(eventId, guests, writes, {
+        ...guest,
+        status: 'confirmed',
+        decision: 'confirmed',
+        companionOfGuestId: parent.guestId,
+      });
+    }
+    return;
+  }
+  const occurrenceCounts = new Map();
+  for (const companion of companions) {
+    const key = normalizeName(companion.name);
+    occurrenceCounts.set(key, (occurrenceCounts.get(key) ?? 0) + 1);
+  }
+  const companionNames = new Set(occurrenceCounts.keys());
+
+  for (const guest of linked) {
+    if (companionNames.has(normalizeName(guest.name))) continue;
+    const pendingGuest = { ...guest, status: 'pending', decision: null };
+    delete pendingGuest.guestRole;
+    delete pendingGuest.companionOfGuestId;
+    delete pendingGuest.companionOfSubmissionId;
+    delete pendingGuest.companionAge;
+    writeRosterGuest(eventId, guests, writes, pendingGuest);
+  }
+
+  for (const companion of companions) {
+    const key = normalizeName(companion.name);
+    if (occurrenceCounts.get(key) !== 1) continue;
+    const candidates = [...guests.values()].filter((guest) => (
+      guest.guestId !== parent.guestId
+      && guest.normalizedName === key
+      && (
+        guest.guestRole === 'companion'
+          ? guest.companionOfSubmissionId === submission.submissionId
+          : guest.status === 'pending' && !guest.submissionId
+      )
+    ));
+    if (candidates.length !== 1) continue;
+    const matchedCompanion = candidates[0];
+    writeRosterGuest(eventId, guests, writes, {
+      ...matchedCompanion,
+      status: submission.decision,
+      decision: submission.decision,
+      guestRole: 'companion',
+      companionOfGuestId: parent.guestId,
+      companionOfSubmissionId: submission.submissionId,
+      companionAge: companion.age,
+    });
+  }
+}
+
 export async function saveGuestPhone(eventId, guest, value) {
   const phone = normalizePhone(value);
   await update(ref(database()), {
@@ -216,7 +309,8 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
         delete pendingGuest.companions;
         delete pendingGuest.associationSource;
         nextGuests.set(priorGuestId, pendingGuest);
-          writes[guestSlotPath(eventId, previousGuest.slot)] = storedGuest(pendingGuest);
+        writes[guestSlotPath(eventId, previousGuest.slot)] = storedGuest(pendingGuest);
+        releaseLinkedCompanions(eventId, submission.submissionId, nextGuests, writes);
       }
       continue;
     }
@@ -236,14 +330,15 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
         const updatedGuest = { ...matchedGuest, status: submission.decision, updatedAt: submission.updatedAt };
         if (submission.companions?.length) updatedGuest.companions = submission.companions;
         else delete updatedGuest.companions;
-        nextGuests.set(updatedGuest.guestId, updatedGuest);
-          writes[guestSlotPath(eventId, updatedGuest.slot)] = storedGuest(updatedGuest);
+        writeRosterGuest(eventId, nextGuests, writes, updatedGuest);
       }
+      syncLinkedCompanions(eventId, submission, matchedGuest, nextGuests, writes);
       continue;
     }
 
     const candidates = [...nextGuests.values()].filter(
-      (guest) => guest.normalizedName === normalizeName(submission.name),
+        (guest) => guest.guestRole !== 'companion'
+          && guest.normalizedName === normalizeName(submission.name),
     );
     if (candidates.length !== 1) {
       const nextStatus = candidates.length > 1 ? 'duplicate-review' : 'unmatched';
@@ -273,8 +368,8 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
     if (submission.companions?.length) updatedGuest.companions = submission.companions;
     else delete updatedGuest.companions;
     const updatedSubmission = capabilityRecord(submission, { status: 'matched', guestId: guest.guestId });
-    nextGuests.set(updatedGuest.guestId, updatedGuest);
-      writes[guestSlotPath(eventId, guest.slot)] = storedGuest(updatedGuest);
+    writeRosterGuest(eventId, nextGuests, writes, updatedGuest);
+    syncLinkedCompanions(eventId, submission, updatedGuest, nextGuests, writes);
     writes[editCapabilityPath(submission.token)] = updatedSubmission;
     writes[submissionInboxPath(eventId, submission.inboxKey)] = inboxRecord(submission, {
       status: 'matched',
@@ -290,8 +385,17 @@ export async function associateInboxSubmission(eventId, submission, guest) {
     throw new Error('Este convidado já possui outra resposta. Desfaça essa associação primeiro.');
   }
   const db = database();
+  const rosterSnapshot = await get(ref(db, rosterPath(eventId)));
+  const rosterEntries = Object.entries(rosterSnapshot.val() ?? {});
+  const nextGuests = new Map(rosterEntries.map(([slot, item]) => [item.guestId, { ...item, slot }]));
+  const currentGuest = nextGuests.get(guest.guestId);
+  if (!currentGuest) throw new Error('O convidado selecionado não existe mais. Atualize a lista.');
+  if (currentGuest.submissionId && currentGuest.submissionId !== submission.submissionId) {
+    throw new Error('Este convidado já possui outra resposta. Desfaça essa associação primeiro.');
+  }
+  const targetGuest = currentGuest;
   const associatedGuest = {
-    ...storedGuest(guest),
+    ...storedGuest(targetGuest),
     associationSource: 'manual',
     status: submission.decision,
     submissionId: submission.submissionId,
@@ -302,7 +406,7 @@ export async function associateInboxSubmission(eventId, submission, guest) {
   else delete associatedGuest.companions;
 
   const writes = {
-    [guestSlotPath(eventId, guest.slot)]: associatedGuest,
+    [guestSlotPath(eventId, targetGuest.slot)]: associatedGuest,
     [editCapabilityPath(submission.token)]: capabilityRecord(submission, {
       status: 'matched',
       guestId: guest.guestId,
@@ -318,8 +422,8 @@ export async function associateInboxSubmission(eventId, submission, guest) {
   };
 
   const previousGuestId = submission.guestId ?? submission.previousGuestId;
-  if (previousGuestId && previousGuestId !== guest.guestId) {
-    const previousGuest = await getGuestById(eventId, previousGuestId);
+  if (previousGuestId && previousGuestId !== targetGuest.guestId) {
+    const previousGuest = nextGuests.get(previousGuestId);
     if (previousGuest?.submissionId === submission.submissionId) {
       const pendingGuest = {
         ...storedGuest(previousGuest),
@@ -331,13 +435,22 @@ export async function associateInboxSubmission(eventId, submission, guest) {
       delete pendingGuest.companions;
       delete pendingGuest.associationSource;
       writes[guestSlotPath(eventId, previousGuest.slot)] = pendingGuest;
+      nextGuests.set(previousGuestId, pendingGuest);
     }
   }
+  releaseLinkedCompanions(eventId, submission.submissionId, nextGuests, writes);
 
+  nextGuests.set(targetGuest.guestId, { ...associatedGuest, slot: targetGuest.slot });
+  syncLinkedCompanions(eventId, submission, { ...associatedGuest, slot: targetGuest.slot }, nextGuests, writes);
   await update(ref(db), writes);
 }
 
 export async function detachInboxSubmission(eventId, submission) {
+  const db = database();
+  const rosterSnapshot = await get(ref(db, rosterPath(eventId)));
+  const nextGuests = new Map(Object.entries(rosterSnapshot.val() ?? {}).map(([slot, guest]) => [
+    guest.guestId, { ...guest, slot },
+  ]));
   const changes = {
     status: 'unmatched',
     guestId: null,
@@ -353,7 +466,7 @@ export async function detachInboxSubmission(eventId, submission) {
   };
   const previousGuestId = submission.guestId ?? submission.previousGuestId;
   if (previousGuestId) {
-    const guest = await getGuestById(eventId, previousGuestId);
+    const guest = nextGuests.get(previousGuestId);
     if (guest?.submissionId === submission.submissionId) {
       const pendingGuest = {
         ...storedGuest(guest),
@@ -367,7 +480,8 @@ export async function detachInboxSubmission(eventId, submission) {
       writes[guestSlotPath(eventId, guest.slot)] = pendingGuest;
     }
   }
-  await update(ref(database()), writes);
+  releaseLinkedCompanions(eventId, submission.submissionId, nextGuests, writes);
+  await update(ref(db), writes);
 }
 
 async function getGuestById(eventId, guestId) {

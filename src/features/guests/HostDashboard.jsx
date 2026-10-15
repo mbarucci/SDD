@@ -7,7 +7,7 @@ import InboxReview from './InboxReview.jsx';
 import CompanionList from './CompanionList.jsx';
 import HostMessages from './HostMessages.jsx';
 import { downloadConfirmedGuests } from './exportConfirmedGuests.js';
-import { confirmedParticipants } from './participantList.js';
+import { companionsForGuest, confirmedParticipants, topLevelGuests } from './participantList.js';
 import { createEvent, listHostEvents, saveEvent } from '../event/eventRepository.js';
 import EventEditor from '../event/EventEditor.jsx';
 import SharePanel from '../sharing/SharePanel.jsx';
@@ -145,8 +145,9 @@ export default function HostDashboard({ user }) {
   }
 
   if (selectedEvent || creating) {
+    const primaryGuests = topLevelGuests(management.guests);
     const guestCounts = {
-      pending: management.guests.filter((guest) => guest.status === 'pending').length,
+      pending: primaryGuests.filter((guest) => guest.status === 'pending').length,
       confirmed: confirmedParticipants(management.guests).length,
       declined: management.guests.filter((guest) => guest.status === 'declined').length,
     };
@@ -251,11 +252,11 @@ export default function HostDashboard({ user }) {
               ].map(([status, title, label]) => (
                 <section className="management-section" key={status}>
                   <h3>{title}</h3>
-                  {management.guests.filter((guest) => guest.status === status).length === 0 ? (
+                  {primaryGuests.filter((guest) => guest.status === status).length === 0 ? (
                     <p className="management-empty">Nenhum convidado nesta lista.</p>
                   ) : (
                     <ul className="management-list">
-                      {management.guests.filter((guest) => guest.status === status).map((guest) => {
+                      {primaryGuests.filter((guest) => guest.status === status).map((guest) => {
                         const submission = management.submissions.find(
                           (item) => item.submissionId === guest.submissionId && item.status === 'matched',
                         );
@@ -265,7 +266,9 @@ export default function HostDashboard({ user }) {
                               <strong>{guest.name}</strong>
                               <span>{label}</span>
                               <GuestPhoneEditor guest={guest} onSave={updatePhone} />
-                              {guest.status === 'confirmed' && <CompanionList guest={guest} />}
+                              {(guest.status === 'confirmed' || guest.status === 'declined') && companionsForGuest(guest, management.guests).length > 0 && (
+                                <CompanionList guest={{ ...guest, companions: companionsForGuest(guest, management.guests) }} />
+                              )}
                             </div>
                             {submission && <EditLinkControls eventId={selectedEvent.id} submission={submission} />}
                           </li>

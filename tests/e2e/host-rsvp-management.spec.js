@@ -196,3 +196,58 @@ test('host corrects automatic associations and edits private phone exported with
   await expect(counts).toContainText('Confirmados: 2');
   await context.close();
 });
+
+test('registered companion inherits the principal RSVP and never appears pending', async ({ page, browser }) => {
+  await registerHost(page);
+  await createDraftEvent(page, 'Acompanhante herda resposta');
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
+  for (const name of ['Alex Silva', 'Bento Silva']) {
+    await page.getByLabel('Nome do convidado').fill(name);
+    await page.getByRole('button', { name: 'Adicionar convidado' }).click();
+    await expect(page.getByRole('status')).toHaveText('Convidado cadastrado.');
+  }
+  await page.getByRole('button', { name: 'Evento', exact: true }).click();
+  await page.getByRole('button', { name: 'Publicar evento' }).click();
+  const eventUrl = await page.getByLabel('Link público do evento').inputValue();
+  const context = await browser.newContext();
+  const guest = await context.newPage();
+  await guest.goto(eventUrl);
+  await guest.getByLabel('Seu nome').fill('Alex Silva');
+  await guest.getByLabel('Vou comparecer').check();
+  await guest.getByRole('button', { name: 'Adicionar acompanhante' }).click();
+  await guest.getByLabel('Nome do acompanhante 1').fill('Bento Silva');
+  await guest.getByLabel('Idade do acompanhante 1').fill('7');
+  await guest.getByRole('button', { name: 'Enviar resposta' }).click();
+  const editUrl = await guest.getByRole('link', { name: 'Editar minha resposta' }).getAttribute('href');
+
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
+  const counts = page.getByRole('group', { name: 'Totais de respostas' });
+  await expect(counts).toContainText('Pendentes: 0');
+  await expect(counts).toContainText('Confirmados: 2');
+  const pending = page.getByRole('heading', { name: 'Pendentes', exact: true }).locator('..');
+  await expect(pending).not.toContainText('Bento Silva');
+  const confirmed = page.getByRole('heading', { name: 'Confirmaram', exact: true }).locator('..');
+  const companions = confirmed.getByRole('list', { name: 'Acompanhantes de Alex Silva' });
+  await expect(companions).toContainText('Bento Silva');
+
+  await guest.goto(editUrl);
+  await guest.getByLabel('Não poderei ir').check();
+  await guest.getByRole('button', { name: 'Salvar resposta' }).click();
+  await expect(guest.getByRole('status')).toContainText('Resposta atualizada');
+  await expect(counts).toContainText('Pendentes: 0');
+  await expect(counts).toContainText('Confirmados: 0');
+  await expect(counts).toContainText('Recusados: 2');
+  const declined = page.getByRole('heading', { name: 'Recusaram', exact: true }).locator('..');
+  await expect(declined).toContainText('Alex Silva');
+  await expect(declined.getByRole('list', { name: 'Acompanhantes de Alex Silva' })).toContainText('Bento Silva');
+  await expect(pending).not.toContainText('Bento Silva');
+
+  await guest.goto(editUrl);
+  await guest.getByLabel('Vou comparecer').check();
+  await guest.getByRole('button', { name: 'Salvar resposta' }).click();
+  await expect(guest.getByRole('status')).toContainText('Resposta atualizada');
+  await expect(counts).toContainText('Pendentes: 0');
+  await expect(counts).toContainText('Confirmados: 2');
+  await expect(declined).not.toContainText('Bento Silva');
+  await context.close();
+});

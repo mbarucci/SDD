@@ -237,7 +237,7 @@ Como convidado, quero consultar os detalhes da festa, confirmar ou recusar prese
 - **Critérios de aceitação**:
   - O convidado consegue editar a resposta sem conta ou login.
   - Salvar uma edição atualiza a resposta existente, sem duplicá-la.
-  - Pelo mesmo link, o convidado consegue incluir, editar ou remover acompanhantes; ao recusar presença, os acompanhantes deixam de integrar a resposta.
+  - Pelo mesmo link, o convidado consegue incluir, editar ou remover acompanhantes; ao recusar presença, os acompanhantes deixam de contar como confirmados. Se um acompanhante corresponder a um único cadastro pendente do anfitrião, esse cadastro fica vinculado ao RSVP principal, herda sua decisão e não aparece como resposta independente pendente. Ao reconfirmar, os acompanhantes vinculados retornam à lista de participantes.
   - Se o nome for alterado, a resposta volta ao estado de revisão e não altera o estado de nenhum convidado até o anfitrião resolver a associação.
   - O anfitrião vê a resposta atualizada na lista do evento.
   - Um acesso inválido ou destinado a outra resposta não permite consultar ou editar os dados.
@@ -294,7 +294,7 @@ Como anfitrião, quero cadastrar convidados e acompanhar quem está pendente, qu
   - O anfitrião consegue cadastrar convidados esperados; cada novo convidado começa com estado pendente.
   - O sistema permite no máximo 100 convidados cadastrados por evento e informa o limite ao anfitrião.
   - O anfitrião consegue consultar os convidados cadastrados separados entre pendentes, confirmados e recusados.
-  - Cada acompanhante aparece como participante adicional sob o RSVP principal e soma um ao total de confirmados; pendentes e recusados continuam contando somente os convidados cadastrados.
+  - Cada acompanhante aparece como participante adicional sob o RSVP principal e soma um ao total de confirmados. Cadastros previamente importados ou adicionados que correspondam sem ambiguidade a acompanhantes são agrupados sob o principal e herdam sua decisão; não aparecem como pendentes independentes.
   - Uma resposta recebida atualiza o estado do convidado correspondente; quem não respondeu permanece pendente.
   - O anfitrião consegue associar manualmente uma resposta ao convidado correto quando nomes cadastrados forem duplicados.
   - Uma resposta com nome duplicado não altera o estado de um convidado até que o anfitrião resolva a associação.
@@ -403,6 +403,7 @@ Convidado: [Sobre a festa] [Fotos] [RSVP] [Mensagem]
 - **FR-028**: A página pública MUST apresentar, junto às imagens hospedadas externamente, um aviso visível de que seus provedores podem receber o endereço IP e metadados de carregamento do visitante; o aviso não deve bloquear nem atrasar o carregamento das imagens.
 
 - **FR-029**: O sistema MUST permitir ao anfitrião importar convidados de Excel `.xlsx` (primeira aba) ou CSV UTF-8, com prévia e mapeamento de colunas antes da confirmação. Nome é obrigatório e telefone é opcional; arquivos limitados a 2 MB e 1.000 linhas, com cabeçalho na primeira linha preenchida. Linhas completamente vazias são ignoradas; erros de dados indicam a linha e impedem a importação inteira. Duplicatas de nome normalizado e telefone (ignorando pontuação) são ignoradas no arquivo e no cadastro existente; nomes iguais com telefones diferentes são mantidos. O lote MUST ser salvo atomicamente, revalidando duplicatas e capacidade no momento da gravação; não sobrescrever cadastros, telefones, respostas ou acompanhantes existentes, nem ultrapassar 100 convidados. Novos cadastros iniciam pendentes. O arquivo é lido localmente, sem serviço externo ou custo adicional.
+- **FR-030**: O sistema MUST vincular automaticamente ao RSVP principal um cadastro de convidado pendente que corresponda unicamente pelo nome normalizado a um acompanhante informado. O cadastro vinculado herda confirmação ou recusa, é exibido agrupado sob o principal e não conta como RSVP independente. Ambiguidades e cadastros já associados a outra resposta não são vinculados automaticamente; o estado e os acompanhantes existentes devem permanecer consistentes ao editar ou reconfirmar a resposta.
 
 ### Key Entities *(include if feature involves data)*
 

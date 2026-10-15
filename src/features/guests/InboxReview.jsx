@@ -54,7 +54,7 @@ export default function InboxReview({ guests, onAssociate, onDelete, onDetach, s
                   value={selectedGuests[submission.submissionId] ?? submission.guestId ?? ''}
                 >
                   <option value="">Selecionar convidado</option>
-                  {guests.map((guest, index) => (
+                  {guests.filter((guest) => guest.guestRole !== 'companion').map((guest, index) => (
                     <option
                       disabled={Boolean(guest.submissionId && guest.submissionId !== submission.submissionId)}
                       key={guest.guestId}
