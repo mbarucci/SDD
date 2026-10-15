@@ -2,6 +2,10 @@ import { get, onValue, push, ref, runTransaction, update } from 'firebase/databa
 import { getFirebaseClient } from '../../services/firebase/client.js';
 import { editCapabilityPath, inboxPath, rosterPath } from '../../services/firebase/paths.js';
 import { normalizeName } from './normalizeName.js';
+import { normalizeGuestFields, normalizePhone } from './guestFields.js';
+import { guestImportKey, prepareGuestImport } from './guestImport.js';
+
+export { normalizePhone } from './guestFields.js';
 
 function database() {
   return getFirebaseClient().database;
@@ -52,14 +56,6 @@ function makeEditToken() {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export function normalizePhone(value = '') {
-  const phone = value.trim();
-  if (phone && (phone.length > 40 || !/^[+0-9(). -]+$/.test(phone) || !/[0-9]/.test(phone))) {
-    throw new Error('Informe um telefone válido com até 40 caracteres.');
-  }
-  return phone;
-}
-
 export async function saveGuestPhone(eventId, guest, value) {
   const phone = normalizePhone(value);
   await update(ref(database()), {
@@ -68,11 +64,8 @@ export async function saveGuestPhone(eventId, guest, value) {
 }
 
 export async function addExpectedGuest(eventId, name, phone = '') {
-  const displayName = name.trim().replace(/\s+/gu, ' ');
+  const { name: displayName, phone: normalizedPhone } = normalizeGuestFields(name, phone);
   const normalizedName = normalizeName(displayName);
-  const normalizedPhone = normalizePhone(phone);
-  if (!displayName) throw new Error('Informe o nome do convidado.');
-  if (displayName.length > 100) throw new Error('O nome deve ter até 100 caracteres.');
 
   const db = database();
   const guestId = push(ref(db, rosterPath(eventId))).key;
@@ -97,6 +90,46 @@ export async function addExpectedGuest(eventId, name, phone = '') {
   }
 
   throw new Error('Este evento já atingiu o limite de 100 convidados.');
+}
+
+export async function importExpectedGuests(eventId, rows) {
+  const validated = prepareGuestImport(rows);
+  if (validated.errors.length) throw new Error(validated.errors.join(' '));
+  const db = database();
+  const timestamp = Date.now();
+  const records = validated.guests.map((guest) => {
+    const guestId = push(ref(db, rosterPath(eventId))).key;
+    if (!guestId) throw new Error('Não foi possível gerar o cadastro do convidado.');
+    return { ...guest, guestId };
+  });
+  let summary;
+  let failure;
+  const result = await runTransaction(ref(db, rosterPath(eventId)), (current) => {
+    const roster = current ?? {};
+    const preview = prepareGuestImport(records, Object.values(roster));
+    failure = preview.errors.join(' ');
+    if (failure) return undefined;
+    const next = { ...roster };
+    const pending = new Set(preview.guests.map(guestImportKey));
+    const imported = records.filter((guest) => pending.has(guestImportKey(guest)));
+    let slotIndex = 1;
+    for (const guest of imported) {
+      let slot;
+      do {
+        slot = `guest-${String(slotIndex).padStart(3, '0')}`;
+        slotIndex += 1;
+      } while (next[slot]);
+      const { phone, ...fields } = guest;
+      next[slot] = {
+        ...fields, ...(phone && { phone }), normalizedName: normalizeName(guest.name),
+        status: 'pending', createdAt: timestamp,
+      };
+    }
+    summary = { imported: imported.length, skipped: validated.skipped + preview.skipped };
+    return next;
+  }, { applyLocally: false });
+  if (!result.committed) throw new Error(failure || 'Não foi possível importar. Atualize a lista e tente novamente.');
+  return summary;
 }
 
 export function listenToEventManagement(eventId, onChange) {

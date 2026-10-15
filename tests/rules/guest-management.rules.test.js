@@ -39,6 +39,21 @@ afterAll(async () => {
 });
 
 describe('guest roster limits', () => {
+  it('allows an atomic owner import but rejects the entire batch with an invalid slot or phone', async () => {
+    const path = 'privateEvents/published-event/guests';
+    const owner = testEnvironment.authenticatedContext('host-one').database();
+    const original = (await get(ref(owner, path))).val();
+    await assertSucceeds(set(ref(owner, path), original));
+    await assertFails(set(ref(owner, path), {
+      ...original, 'guest-101': { ...original['guest-001'], guestId: 'overflow' },
+    }));
+    await assertFails(set(ref(owner, path), {
+      ...original, 'guest-001': { ...original['guest-001'], phone: 'inválido' },
+    }));
+    expect((await get(ref(owner, path))).val()).toEqual(original);
+    await assertFails(set(ref(testEnvironment.unauthenticatedContext().database(), path), original));
+    await assertFails(set(ref(testEnvironment.authenticatedContext('other-host').database(), path), original));
+  });
   it('keeps phone private and validates owner edits without requiring it on old records', async () => {
     const path = 'privateEvents/published-event/guests/guest-001/phone';
     const owner = testEnvironment.authenticatedContext('host-one').database();

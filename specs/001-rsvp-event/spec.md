@@ -402,6 +402,8 @@ Convidado: [Sobre a festa] [Fotos] [RSVP] [Mensagem]
 - **FR-027**: O sistema MUST usar o endereço informado para construir o link de direções, codificando-o como destino; o anfitrião deve revisar o destino antes da publicação, e o endereço permanece visível mesmo se o Maps não conseguir gerar uma rota útil.
 - **FR-028**: A página pública MUST apresentar, junto às imagens hospedadas externamente, um aviso visível de que seus provedores podem receber o endereço IP e metadados de carregamento do visitante; o aviso não deve bloquear nem atrasar o carregamento das imagens.
 
+- **FR-029**: O sistema MUST permitir ao anfitrião importar convidados de Excel `.xlsx` (primeira aba) ou CSV UTF-8, com prévia e mapeamento de colunas antes da confirmação. Nome é obrigatório e telefone é opcional; arquivos limitados a 2 MB e 1.000 linhas, com cabeçalho na primeira linha preenchida. Linhas completamente vazias são ignoradas; erros de dados indicam a linha e impedem a importação inteira. Duplicatas de nome normalizado e telefone (ignorando pontuação) são ignoradas no arquivo e no cadastro existente; nomes iguais com telefones diferentes são mantidos. O lote MUST ser salvo atomicamente, revalidando duplicatas e capacidade no momento da gravação; não sobrescrever cadastros, telefones, respostas ou acompanhantes existentes, nem ultrapassar 100 convidados. Novos cadastros iniciam pendentes. O arquivo é lido localmente, sem serviço externo ou custo adicional.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Evento**: Festa criada pelo anfitrião, com título, data, horário, local, descrição, textos e acesso público.

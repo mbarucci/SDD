@@ -2,6 +2,18 @@
 
 Aplicação web de RSVP com eventos públicos, respostas anônimas e gestão privada pelo anfitrião. A aplicação usa Firebase Authentication e Realtime Database; fotos são URLs HTTPS externas e o link de direções usa uma URL do Google Maps, sem Maps API.
 
+## Importação de convidados
+
+No painel do anfitrião, abra **Convidados > Importar convidados**:
+
+1. Selecione um arquivo Excel `.xlsx` (primeira aba) ou CSV UTF-8 separado por vírgula, ponto e vírgula ou tabulação.
+2. Use a primeira linha preenchida como cabeçalho. As colunas `Nome` e `Telefone` são reconhecidas automaticamente; outros títulos podem ser escolhidos na prévia. Nome é obrigatório, telefone é opcional.
+3. Confira a prévia e confirme a importação. O arquivo é lido no navegador; somente os cadastros confirmados são gravados no Firebase.
+
+Duplicatas com nome normalizado e telefone iguais (ignorando pontuação telefônica) são ignoradas, inclusive dentro do mesmo arquivo. Nomes iguais com telefones diferentes são preservados. Cadastros e respostas existentes nunca são sobrescritos. Se o lote exceder o limite de 100 convidados ou tiver dados inválidos, nenhum cadastro será importado.
+
+Limites por arquivo: 2 MB e 1.000 linhas de dados. Arquivos `.xls` devem ser salvos como `.xlsx`. No Excel, formate telefones como texto para preservar zeros e prefixos que já poderiam ter sido perdidos em células numéricas. A importação não confirma presença: os novos cadastros começam pendentes e seguem as regras existentes de associação de RSVP.
+
 ## Desenvolvimento local
 
 Requisitos: Node.js 24 LTS, npm e Firebase CLI. Use `nvm use` para selecionar a versão registrada em `.nvmrc`.

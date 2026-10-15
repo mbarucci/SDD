@@ -5,7 +5,7 @@ import { createDraftEvent, registerHost } from './helpers.js';
 test('host reviews duplicate RSVP, reads its private message, and finds inbox after reopening', async ({ page, browser }) => {
   await registerHost(page);
   await createDraftEvent(page, 'Festa da equipe');
-  await page.getByRole('button', { name: 'Convidados' }).click();
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
   await page.getByLabel('Nome do convidado').fill('Alex Silva');
   await page.getByRole('button', { name: 'Adicionar convidado' }).click();
   await expect(page.getByRole('status')).toHaveText('Convidado cadastrado.');
@@ -32,7 +32,7 @@ test('host reviews duplicate RSVP, reads its private message, and finds inbox af
   await guestPage.getByLabel('Mensagem ao anfitrião').fill('Preciso de opção vegetariana.');
   await guestPage.getByRole('button', { name: 'Enviar resposta' }).click();
 
-  await page.getByRole('button', { name: 'Convidados' }).click();
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
   await expect(page.getByText('Revisão necessária')).toBeVisible({ timeout: 5000 });
   await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Pendentes: 2');
   const inboxCompanions = page.getByRole('list', { name: 'Acompanhantes de Alex Silva' });
@@ -73,7 +73,7 @@ test('host reviews duplicate RSVP, reads its private message, and finds inbox af
   await guestPage.getByRole('button', { name: 'Enviar resposta' }).click();
   await expect(guestPage.getByRole('heading', { name: 'Resposta enviada' })).toBeVisible();
   await page.getByRole('button', { name: 'Festa da equipe' }).click();
-  await page.getByRole('button', { name: 'Convidados' }).click();
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
   await expect(page.getByText('Nome sem cadastro', { exact: true })).toBeVisible();
   await expect(page.getByText('Resposta recebida fora da gestão.')).toBeVisible();
   await page.getByRole('button', { name: 'Excluir envio' }).click();
@@ -86,7 +86,7 @@ test('host reviews duplicate RSVP, reads its private message, and finds inbox af
 test('host can manually associate a renamed RSVP and release its previous guest', async ({ page, browser }) => {
   await registerHost(page);
   await createDraftEvent(page, 'Festa com nome corrigido');
-  await page.getByRole('button', { name: 'Convidados' }).click();
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
   await page.getByLabel('Nome do convidado').fill('Alex Silva');
   await page.getByRole('button', { name: 'Adicionar convidado' }).click();
   await expect(page.getByRole('status')).toHaveText('Convidado cadastrado.');
@@ -104,14 +104,14 @@ test('host can manually associate a renamed RSVP and release its previous guest'
   await guestPage.getByLabel('Vou comparecer').check();
   await guestPage.getByRole('button', { name: 'Enviar resposta' }).click();
   const editUrl = await guestPage.getByRole('link', { name: 'Editar minha resposta' }).getAttribute('href');
-  await page.getByRole('button', { name: 'Convidados' }).click();
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Confirmados: 1');
   await guestPage.goto(editUrl);
   await guestPage.getByLabel('Seu nome').fill('Alex Souza');
   await guestPage.getByRole('button', { name: 'Salvar resposta' }).click();
   await expect(guestPage.getByRole('status')).toContainText('Resposta atualizada');
 
-  await page.getByRole('button', { name: 'Convidados' }).click();
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
   await expect(page.getByText('Revisão necessária')).toBeVisible();
   await page.getByLabel('Associar resposta de Alex Souza').selectOption({ label: 'Beatriz Lima' });
   await page.getByRole('button', { name: 'Associar resposta' }).click();

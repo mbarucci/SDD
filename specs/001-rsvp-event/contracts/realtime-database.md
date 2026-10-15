@@ -28,6 +28,8 @@ Este contrato especifica fronteiras de autorização para o SDK Web. Não define
 
 ### Gerir evento
 
+- Importação usa transação em `privateEvents/{eventId}/guests`, permitida somente ao proprietário. Como a autorização acontece no ancestral, a validação de cada `$guestSlot` também restringe a chave a `guest-001`–`guest-100`; uma chave inválida ou um telefone inválido rejeita o lote inteiro. A leitura privada e a validação de todos os campos continuam obrigatórias. No cliente, a transação reconfirma duplicatas e limite a cada tentativa, preservando os registros existentes e abortando sem gravação parcial quando faltarem vagas.
+
 - Exigir `auth != null` e igualdade entre `auth.uid` e o proprietário persistido.
 - Aplicar a mesma checagem para leitura e escrita de convidados, respostas, mensagens e exportação.
 - Negar acesso de outro anfitrião mesmo que conheça `eventId`.

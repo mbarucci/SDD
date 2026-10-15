@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { associateInboxSubmission, addExpectedGuest, deleteInboxSubmission, detachInboxSubmission, listenToEventManagement, reconcileEventInbox, saveGuestPhone } from './guestRepository.js';
 import GuestPhoneEditor from './GuestPhoneEditor.jsx';
+import GuestImport from './GuestImport.jsx';
 import EditLinkControls from './EditLinkControls.jsx';
 import InboxReview from './InboxReview.jsx';
 import CompanionList from './CompanionList.jsx';
@@ -241,6 +242,7 @@ export default function HostDashboard({ user }) {
             </form>
             {guestNotice && <p className="form-status" role="status">{guestNotice}</p>}
             {managementError && <p className="form-error" role="alert">{managementError}</p>}
+            <GuestImport eventId={selectedEvent.id} guests={management.guests} key={selectedEvent.id} />
             <div className="guest-groups">
               {[
                 ['pending', 'Pendentes', 'Sem resposta'],

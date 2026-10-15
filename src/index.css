@@ -335,6 +335,20 @@ textarea {
   justify-self: start;
 }
 
+.guest-import {
+  margin-bottom: 32px;
+}
+
+.guest-import input[type="file"],
+.guest-import select {
+  width: 100%;
+  max-width: 100%;
+}
+
+.guest-import select {
+  min-height: 44px;
+}
+
 @media (max-width: 680px) {
   .guest-registration-fields {
     grid-template-columns: minmax(0, 1fr);

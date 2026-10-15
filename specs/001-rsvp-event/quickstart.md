@@ -49,6 +49,9 @@ npm run build
 
 Antes do deploy desta atualização, validar também:
 
+- Em Convidados, importar `.xlsx` (primeira aba) e CSV UTF-8; escolher colunas, conferir prévia e cancelar antes de salvar. Confirmar telefones com zero inicial como texto e telefone opcional.
+- Reimportar o arquivo: duplicatas de nome/telefone são ignoradas, mas homônimos com telefones diferentes permanecem. Verificar dados antigos e RSVP associados sem alterações.
+- Tentar importar telefone inválido e um lote que exceda as vagas: nenhum registro deve ser criado. Importar exatamente até 100 convidados e confirmar bloqueio do excedente, inclusive se as vagas forem ocupadas enquanto a prévia está aberta.
 - Cadastrar convidado com e sem telefone; editar e remover o número no painel. Confirmar que o RSVP público e o link de edição não expõem o telefone.
 - Enviar RSVP com nome único e acompanhantes; trocar a associação automática para outro cadastro livre. Conferir que resposta e acompanhantes são transferidos, os totais não duplicam e o telefone usado no CSV é o do cadastro destino.
 - Desfazer a associação, recarregar a gestão e editar o RSVP pelo link individual. Confirmar que permanece em revisão até a associação manual; verificar que outro RSVP não substitui uma associação marcada como manual.

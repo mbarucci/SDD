@@ -43,6 +43,8 @@ Este modelo é uma proposta para Firebase Realtime Database. Os caminhos exatos 
 - `companions`: lista privada opcional de até 20 acompanhantes do RSVP confirmado; cada item contém nome (até 100 caracteres) e idade inteira entre 0 e 120. Cada acompanhante conta como participante confirmado adicional.
 - Relação: uma resposta associada; nomes duplicados exigem resolução pelo anfitrião.
 
+Importações criam somente entidades de convidado cadastrado, sem persistir o arquivo ou a prévia. A chave de deduplicação combina o nome normalizado e os dígitos do telefone; ausência de telefone equivale a uma string vazia. O roster é gravado por transação para preservar alterações concorrentes e verificar as vagas disponíveis, mantendo os slots `guest-001` a `guest-100`. Cada registro novo recebe ID próprio, estado pendente e data de criação.
+
 ### Submissão RSVP
 
 - `submissionId`: ID aleatório da submissão.

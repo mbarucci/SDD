@@ -71,7 +71,7 @@ test('an invalid edit token does not reveal an RSVP', async ({ page }) => {
 test('host revokes the old edit link and issues a replacement for the same RSVP', async ({ page, browser }) => {
   await registerHost(page);
   await createDraftEvent(page, 'Festa com novo link');
-  await page.getByRole('button', { name: 'Convidados' }).click();
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
   await page.getByLabel('Nome do convidado').fill('Joana');
   await page.getByRole('button', { name: 'Adicionar convidado' }).click();
   await expect(page.getByRole('status')).toHaveText('Convidado cadastrado.');
@@ -87,7 +87,7 @@ test('host revokes the old edit link and issues a replacement for the same RSVP'
   await guestPage.getByRole('button', { name: 'Enviar resposta' }).click();
   const originalEditUrl = await guestPage.getByRole('link', { name: 'Editar minha resposta' }).getAttribute('href');
 
-  await page.getByRole('button', { name: 'Convidados' }).click();
+  await page.getByRole('button', { name: 'Convidados', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Totais de respostas' })).toContainText('Confirmados: 1');
   await page.getByRole('button', { name: 'Revogar e emitir novo link' }).click();
   const replacementLink = page.getByRole('link', { name: 'Abrir novo link de edição' });
