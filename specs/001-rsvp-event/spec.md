@@ -22,6 +22,16 @@
 - Q: Que requisitos de acessibilidade devem ser garantidos para fotos, navegação por teclado e links? (CHK005) → A: Fotos informativas e imagem do local têm texto alternativo; controles e links funcionam por teclado, com foco visível e nomes acessíveis.
 - Q: Que limite deve orientar as decisões assumidas para os demais itens desta revisão? → A: Adotar recomendações sem custo financeiro adicional nem degradação de desempenho para as demais funcionalidades.
 
+### Session 2026-10-15
+
+- Q: Ao editar um convidado cadastrado, quais dados o anfitrião deve poder alterar? → A: Alterar nome e telefone; manter a decisão RSVP e os acompanhantes como estão.
+- Q: Se o anfitrião excluir um convidado que já enviou RSVP, o que deve acontecer com essa resposta? → A: Excluir o cadastro do convidado, seu RSVP associado e o link individual de edição, mediante confirmação explícita.
+- Q: Se o convidado excluído tiver acompanhantes que também eram cadastros independentes na lista, o que deve acontecer com esses cadastros? → A: Marcar os acompanhantes como inativos e permitir que sejam excluídos individualmente; não bloquear a exclusão do convidado principal.
+- Q: Se os dois convidados que o anfitrião quer mesclar já tiverem RSVP associado, como o sistema deve tratar as duas respostas? → A: Bloquear a mesclagem até o anfitrião resolver uma das associações.
+- Q: Ao mesclar dois cadastros, qual nome e telefone devem ficar no cadastro resultante? → A: Manter nome e telefone do cadastro principal escolhido; se esse cadastro não tiver telefone, copiar o do outro. Se ambos tiverem telefones diferentes, exigir resolução manual antes de mesclar.
+- Q: Como os acompanhantes devem ser tratados quando dois convidados são mesclados? → A: Mesclar junto as listas de acompanhantes dos convidados; considerar a mesma pessoa quando nome normalizado e idade forem iguais, manter uma entrada nesse caso e preservar ambas quando forem diferentes. A exclusão individual de acompanhantes também deve ser permitida.
+- Q: Acompanhantes inativos devem continuar ocupando uma das 100 vagas de convidados? → A: Não. Registros inativos ficam fora do limite de 100 convidados ativos.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Preparar e divulgar o evento (Priority: P1)
@@ -292,7 +302,14 @@ Como anfitrião, quero cadastrar convidados e acompanhar quem está pendente, qu
 
 - **Critérios de aceitação**:
   - O anfitrião consegue cadastrar convidados esperados; cada novo convidado começa com estado pendente.
-  - O sistema permite no máximo 100 convidados cadastrados por evento e informa o limite ao anfitrião.
+  - O anfitrião consegue corrigir o nome e o telefone de um convidado cadastrado sem alterar sua decisão RSVP ou seus acompanhantes.
+  - O anfitrião consegue excluir um convidado; se houver um RSVP associado, o sistema solicita confirmação e exclui também a resposta e seu link individual de edição.
+  - Ao excluir um convidado principal, seus acompanhantes cadastrados ficam inativos, não contam como participantes e podem ser excluídos individualmente; sua existência não bloqueia a exclusão do principal.
+  - Acompanhantes inativos não ocupam vagas do limite de 100 convidados ativos e ficam disponíveis em uma área separada até sua exclusão individual.
+  - O anfitrião consegue mesclar cadastros duplicados; a mesclagem fica bloqueada se ambos tiverem RSVP associado, até que uma das associações seja resolvida.
+  - Na mesclagem, o anfitrião escolhe qual cadastro permanece; o nome desse cadastro prevalece, um telefone ausente pode ser preenchido pelo outro cadastro e telefones diferentes precisam ser resolvidos antes de prosseguir.
+  - A mesclagem de convidados também mescla suas listas de acompanhantes; entradas com mesmo nome normalizado e idade são consideradas a mesma pessoa e ficam em uma única entrada, enquanto as diferentes permanecem. O anfitrião pode excluir um acompanhante individualmente do cadastro sem excluir os demais ou o convidado.
+  - O sistema permite no máximo 100 convidados ativos por evento e informa o limite ao anfitrião; registros inativos não consomem vagas.
   - O anfitrião consegue consultar os convidados cadastrados separados entre pendentes, confirmados e recusados.
   - Cada acompanhante aparece como participante adicional sob o RSVP principal e soma um ao total de confirmados. Cadastros previamente importados ou adicionados que correspondam sem ambiguidade a acompanhantes são agrupados sob o principal e herdam sua decisão; não aparecem como pendentes independentes.
   - Uma resposta recebida atualiza o estado do convidado correspondente; quem não respondeu permanece pendente.
@@ -356,6 +373,11 @@ Convidado: [Sobre a festa] [Fotos] [RSVP] [Mensagem]
 - O nome informado não corresponde a nenhum convidado cadastrado; nenhum estado de RSVP é alterado.
 - A comparação de nomes ignora caixa, espaços externos/repetidos e equivalências Unicode canônicas, mas preserva acentos e pontuação; nomes que diferem apenas por acento não são associados automaticamente.
 - Um RSVP sem correspondência permanece na inbox privada até ser excluído pelo anfitrião; não expira automaticamente e não altera o roster.
+- Excluir um convidado com RSVP associado exige confirmação explícita e remove o cadastro, a resposta e o respectivo link individual de edição; acompanhantes cadastrados vinculados passam a inativos e podem ser excluídos individualmente.
+- Não é permitido mesclar dois convidados quando ambos têm RSVP associado; o anfitrião deve resolver uma das associações antes da mesclagem.
+- Se os dois cadastros a mesclar tiverem telefones diferentes, o anfitrião deve corrigir o conflito antes de confirmar; o nome do cadastro principal escolhido permanece.
+- A mesclagem é realizada entre convidados principais, nunca entre acompanhantes isoladamente; as listas de acompanhantes são combinadas, considerando duplicadas as entradas com mesmo nome normalizado e idade. As demais entradas são preservadas. A exclusão individual de um acompanhante remove somente essa pessoa do cadastro do convidado.
+- Acompanhantes inativos são mantidos fora do roster e do limite de 100 convidados ativos até serem excluídos individualmente; recadastrar alguém que esteja inativo cria um novo cadastro ativo independente.
 - Uma submissão aponta para um evento inexistente ou não publicado, omite o nome, usa uma opção de RSVP inválida ou contém uma mensagem acima de 500 caracteres; o envio é rejeitado sem alterar respostas existentes.
 - Envios anônimos repetidos e mensagens abusivas dentro dos limites de formato e tamanho não têm limite confiável por pessoa nem moderação automática no MVP; o risco residual de abuso é aceito.
 - O nome digitado não comprova a identidade do convidado; o risco de uma pessoa responder por outra é aceito no MVP.
@@ -363,7 +385,7 @@ Convidado: [Sobre a festa] [Fotos] [RSVP] [Mensagem]
 - Um link de edição é compartilhado ou obtido por outra pessoa; essa pessoa pode consultar e alterar somente a resposta correspondente até o anfitrião revogar o link.
 - Uma URL pública externa é removida ou o provedor registra dados de acesso; a página mostra alternativa para a imagem indisponível e informa que o provedor externo pode receber IP e metadados de carregamento.
 - O endereço está incompleto ou não gera rota útil; o endereço digitado continua visível e o link abre o Google Maps com o destino codificado, sem promessa de validar a rota.
-- O evento já tem 100 convidados cadastrados ou o Firebase rejeita uma conexão/gravação no limite Spark; o sistema informa o limite ou falha recuperável, preserva os dados não enviados e orienta nova tentativa.
+- O evento já tem 100 convidados ativos ou o Firebase rejeita uma conexão/gravação no limite Spark; o sistema informa o limite ou falha recuperável, preserva os dados não enviados e orienta nova tentativa. Acompanhantes inativos não ocupam vagas.
 - O anfitrião não está autenticado ou tenta gerir um evento que não criou; os controles privados permanecem inacessíveis.
 - O convidado tenta ler a lista, inbox, mensagem privada ou RSVP de outra pessoa; o acesso é negado. O link individual só autoriza a resposta correspondente.
 - Um convidado envia RSVP sem login; somente os dados necessários à resposta são aceitos e dados privados do evento não são expostos.
@@ -398,12 +420,18 @@ Convidado: [Sobre a festa] [Fotos] [RSVP] [Mensagem]
 - **FR-023**: O sistema MUST manter na fila privada os dados necessários à associação de uma submissão (nome informado, decisão, mensagem opcional, data e estado) até associação ou exclusão manual, sem expiração automática; após associação, o registro permanece como RSVP privado. O anfitrião MUST conseguir resolver manualmente nomes duplicados e excluir envios sem correspondência.
 - **FR-024**: Convidados sem login MUST poder ler somente o conteúdo público do evento e criar uma submissão de RSVP com mensagem opcional; não podem ler roster, inbox, mensagens privadas ou respostas de outras pessoas. Um link de edição MUST permitir acesso somente à resposta correspondente.
 - **FR-025**: O sistema MUST fornecer texto alternativo para fotos informativas e para a imagem do local; links e controles MUST ter nomes acessíveis, funcionar por teclado e exibir foco visível.
-- **FR-026**: O sistema MUST permitir até 100 convidados cadastrados por evento, independentemente de conexões simultâneas; se um envio falhar por indisponibilidade ou limite de conexões, deve preservar os dados do formulário e informar que o convidado pode tentar novamente.
+- **FR-026**: O sistema MUST permitir até 100 convidados ativos por evento, sem contar acompanhantes inativos; se um envio falhar por indisponibilidade ou limite de conexões, deve preservar os dados do formulário e informar que o convidado pode tentar novamente.
 - **FR-027**: O sistema MUST usar o endereço informado para construir o link de direções, codificando-o como destino; o anfitrião deve revisar o destino antes da publicação, e o endereço permanece visível mesmo se o Maps não conseguir gerar uma rota útil.
 - **FR-028**: A página pública MUST apresentar, junto às imagens hospedadas externamente, um aviso visível de que seus provedores podem receber o endereço IP e metadados de carregamento do visitante; o aviso não deve bloquear nem atrasar o carregamento das imagens.
 
-- **FR-029**: O sistema MUST permitir ao anfitrião importar convidados de Excel `.xlsx` (primeira aba) ou CSV UTF-8, com prévia e mapeamento de colunas antes da confirmação. Nome é obrigatório e telefone é opcional; arquivos limitados a 2 MB e 1.000 linhas, com cabeçalho na primeira linha preenchida. Linhas completamente vazias são ignoradas; erros de dados indicam a linha e impedem a importação inteira. Duplicatas de nome normalizado e telefone (ignorando pontuação) são ignoradas no arquivo e no cadastro existente; nomes iguais com telefones diferentes são mantidos. O lote MUST ser salvo atomicamente, revalidando duplicatas e capacidade no momento da gravação; não sobrescrever cadastros, telefones, respostas ou acompanhantes existentes, nem ultrapassar 100 convidados. Novos cadastros iniciam pendentes. O arquivo é lido localmente, sem serviço externo ou custo adicional.
+- **FR-029**: O sistema MUST permitir ao anfitrião importar convidados de Excel `.xlsx` (primeira aba) ou CSV UTF-8, com prévia e mapeamento de colunas antes da confirmação. Nome é obrigatório e telefone é opcional; arquivos limitados a 2 MB e 1.000 linhas, com cabeçalho na primeira linha preenchida. Linhas completamente vazias são ignoradas; erros de dados indicam a linha e impedem a importação inteira. Duplicatas de nome normalizado e telefone (ignorando pontuação) são ignoradas no arquivo e nos cadastros ativos existentes; nomes iguais com telefones diferentes são mantidos. O lote MUST ser salvo atomicamente, revalidando duplicatas e capacidade no momento da gravação; não sobrescrever cadastros, telefones, respostas ou acompanhantes existentes, nem ultrapassar 100 convidados ativos. Novos cadastros iniciam pendentes. O arquivo é lido localmente, sem serviço externo ou custo adicional.
 - **FR-030**: O sistema MUST vincular automaticamente ao RSVP principal um cadastro de convidado pendente que corresponda unicamente pelo nome normalizado a um acompanhante informado. O cadastro vinculado herda confirmação ou recusa, é exibido agrupado sob o principal e não conta como RSVP independente. Ambiguidades e cadastros já associados a outra resposta não são vinculados automaticamente; o estado e os acompanhantes existentes devem permanecer consistentes ao editar ou reconfirmar a resposta.
+- **FR-031**: O sistema MUST permitir ao anfitrião editar o nome e o telefone de um convidado cadastrado, sem alterar a decisão RSVP, a associação da resposta ou a lista de acompanhantes.
+- **FR-032**: O sistema MUST permitir ao anfitrião excluir um convidado cadastrado. Se houver RSVP associado, a ação MUST exigir confirmação explícita e excluir também o RSVP e sua capacidade/link individual de edição.
+- **FR-033**: Ao excluir um convidado principal, o sistema MUST marcar como inativos os acompanhantes cadastrados vinculados, excluí-los dos totais e listas de participantes ativos, exibi-los em uma área separada, não contá-los no limite de 100 convidados ativos e permitir ao anfitrião excluir cada acompanhante inativo individualmente.
+- **FR-034**: O sistema MUST permitir ao anfitrião mesclar dois convidados principais, mantendo um cadastro principal e transferindo para ele o RSVP e as listas de acompanhantes dos dois cadastros, quando houver no máximo um RSVP associado. Se ambos tiverem RSVP associado, a mesclagem MUST ser bloqueada até que o anfitrião resolva uma das associações. A mesclagem MUST ser de convidados principais, não de acompanhantes isolados.
+- **FR-035**: Na mesclagem, o sistema MUST manter o nome do cadastro principal escolhido; deve preservar seu telefone ou preencher um telefone ausente com o valor do outro cadastro. Se ambos tiverem telefones não vazios e diferentes, a mesclagem MUST ser bloqueada até resolução manual.
+- **FR-036**: Ao mesclar convidados, o sistema MUST tratar entradas de acompanhante com mesmo nome normalizado e idade como a mesma pessoa e mantê-las uma única vez; todas as demais entradas MUST ser preservadas. O anfitrião MUST poder excluir individualmente um acompanhante do cadastro de um convidado, sem excluir os demais acompanhantes ou o convidado principal.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -412,7 +440,7 @@ Convidado: [Sobre a festa] [Fotos] [RSVP] [Mensagem]
 - **Localização do evento**: Endereço, URL pública opcional e texto alternativo da imagem estática do local, além do link de direções no Google Maps.
 - **Foto**: Referência a uma imagem hospedada externamente, composta por URL pública e texto de apoio opcional.
 - **Resposta RSVP**: Registro de nome, decisão de presença e data da última atualização, associado ao convidado cadastrado correspondente.
-- **Convidado cadastrado**: Pessoa adicionada pelo anfitrião à lista do evento, inicialmente pendente e associada à resposta quando recebida; nomes duplicados exigem resolução manual.
+- **Convidado cadastrado**: Pessoa adicionada pelo anfitrião à lista do evento, inicialmente pendente e associada à resposta quando recebida; nomes duplicados exigem resolução manual. Um acompanhante cadastrado pode ficar inativo após a exclusão do convidado principal e ser removido individualmente pelo anfitrião.
 - **Mensagem**: Texto opcional de um convidado, associado ao evento e à sua resposta, visível ao anfitrião.
 - **Acesso privado**: Sessão autenticada do anfitrião proprietário para gerir o evento, ou link individual que permite ao convidado editar sua própria resposta sem login.
 
@@ -437,7 +465,7 @@ Convidado: [Sobre a festa] [Fotos] [RSVP] [Mensagem]
 - A lista de pendentes inclui somente pessoas cadastradas pelo anfitrião; sem cadastro prévio, o sistema não sabe quem foi convidado e ainda não respondeu.
 - O convidado informa o nome cadastrado para associar a resposta. A comparação ignora caixa e espaços externos/repetidos, normaliza formas Unicode canônicas e preserva acentos e pontuação; nomes duplicados são resolvidos manualmente.
 - Como convidados não entram em uma conta, o nome digitado não comprova identidade; o risco de resposta em nome de outra pessoa é aceito no MVP.
-- Cada evento admite até 100 convidados cadastrados; isso não representa 100 conexões simultâneas. O limite Spark é de 100 conexões simultâneas por instância, incluindo anfitriões; não há garantia de acesso simultâneo para todos os convidados.
+- Cada evento admite até 100 convidados ativos, sem contar acompanhantes inativos; isso não representa 100 conexões simultâneas. O limite Spark é de 100 conexões simultâneas por instância, incluindo anfitriões; não há garantia de acesso simultâneo para todos os convidados.
 - O token de edição é um segredo bearer sem expiração automática; quem o obtiver pode ler ou editar somente a resposta correspondente. O anfitrião pode revogar o token e emitir outro; o convidado deve pedir novo acesso ao anfitrião, sem reenvio automatizado.
 - Submissões anônimas têm validação de evento, formato e tamanho, mas não têm limitação confiável por pessoa nem moderação automática de mensagens; o risco residual de spam e conteúdo abusivo é aceito no MVP.
 - As únicas opções de RSVP nesta versão são “Confirmarei presença” e “Não poderei comparecer”.

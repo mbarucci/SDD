@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { get, ref, set } from 'firebase/database';
+import { get, ref, remove, set } from 'firebase/database';
 
 const projectId = 'demo-taskify';
 let testEnvironment;
@@ -242,5 +242,33 @@ describe('anonymous RSVP rules', () => {
       updatedAt: 101,
       status: 'unmatched',
     }));
+  });
+
+  it('allows only the event owner to delete an edit capability', async () => {
+    const tokenPath = 'publicEditCapabilities/6123456789012345678901234567890123456789012';
+    const capability = {
+      eventId: 'published-event',
+      submissionId: 'delete-me',
+      name: 'Helena',
+      decision: 'confirmed',
+      message: '',
+      createdAt: 100,
+      updatedAt: 100,
+      status: 'matched',
+      guestId: 'guest-one',
+    };
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await set(ref(context.database(), tokenPath), capability);
+    });
+
+    const owner = testEnvironment.authenticatedContext('host-one').database();
+    const otherHost = testEnvironment.authenticatedContext('host-two').database();
+    const guest = testEnvironment.unauthenticatedContext().database();
+    await assertFails(remove(ref(otherHost, tokenPath)));
+    await assertFails(remove(ref(guest, tokenPath)));
+    await assertSucceeds(remove(ref(owner, tokenPath)));
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      expect((await get(ref(context.database(), tokenPath))).exists()).toBe(false);
+    });
   });
 });

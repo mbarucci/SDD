@@ -1,45 +1,45 @@
 # Plano de Implementação: RSVP de Festa
 
-**Branch**: `001-rsvp-event` | **Data**: 2026-10-05 | **Spec**: [spec.md](spec.md)
+**Branch**: `main` (checkout atual; feature `001-rsvp-event`) | **Data**: 2026-10-15 | **Spec**: [spec.md](spec.md)
 
-**Status**: Plano de design concluído; implementação depende da validação das Security Rules e da escolha de provedores sem custo adicional.
+**Status**: Plano de design para gestão avançada de convidados concluído; implementar após geração/ordenação das tarefas e validar Rules no Emulator Suite.
 
 ## Resumo
 
-Aplicação web responsiva de RSVP. O anfitrião usa Firebase Authentication para criar e gerir eventos; convidados consultam o conteúdo publicado e enviam RSVP sem login. A proposta usa React/Vite, Firebase Web SDK e Realtime Database no Spark, sem Cloud Functions ou API própria. Submissões anônimas ficam numa caixa de entrada privada ao anfitrião, que as associa ao cadastro de convidados. Um RSVP confirmado pode incluir até 20 acompanhantes, que permanecem vinculados à resposta e contam individualmente na lista e na exportação. Fotos da galeria e foto opcional do espaço são URLs HTTPS externas fornecidas pelo anfitrião, sem provedor escolhido. O endereço tem um link de direções do Google Maps, sem API ou billing.
+Estender a área autenticada de convidados para editar cadastro (nome/telefone), excluir convidados com RSVP/link associado mediante confirmação, inativar e remover acompanhantes cadastrados individualmente, e mesclar dois convidados principais com RSVP e acompanhantes. Preservar Firebase Authentication e Realtime Database existentes; autorizar as operações pelo UID proprietário e executar mudanças relacionadas em gravações multipath atômicas. O roster terá até 100 convidados ativos; acompanhantes inativos ficam em coleção privada separada e não consomem vagas. Mesclagens bloqueiam conflitos de resposta/telefone, deduplicam acompanhantes por nome normalizado e idade e mantêm acompanhantes distintos.
 
 ## Contexto Técnico
 
-**Linguagem/Versão**: JavaScript moderno; fixar versão LTS do Node.js durante o bootstrap.
+**Linguagem/Versão**: JavaScript moderno (ES modules); Node.js 24 LTS, declarado em `.nvmrc` e `package.json`.
 
-**Dependências principais**: React, Vite, Tailwind CSS, Firebase Web SDK, biblioteca client-side de QR Code a selecionar após revisão de manutenção e dependências.
+**Dependências principais**: React 19, Vite 7, Tailwind CSS 4, Firebase Web SDK 12; reutilizar os componentes e serviços existentes, sem dependência nova.
 
-**Armazenamento**: Firebase Realtime Database no plano Spark; URLs públicas de imagens externas. Não armazenar arquivos de imagem no Firebase.
+**Armazenamento**: Firebase Realtime Database no plano Spark; roster ativo sob `privateEvents/{eventId}/guests`, histórico inativo sob `privateEvents/{eventId}/inactiveGuests`, submissões em `inbox` e capacidades individuais em `publicEditCapabilities`.
 
-**Testes**: Firebase Local Emulator Suite (Authentication e Realtime Database), testes automatizados de Security Rules, testes unitários e Playwright para fluxos no navegador.
+**Testes**: Vitest unitário, Firebase Local Emulator Suite para Security Rules, Playwright para fluxos no navegador, `npm run build`.
 
-**Plataforma-alvo**: Navegadores móveis e desktop; hosting estático, com Firebase Hosting como preferência inicial sujeita à comparação com Vercel/Netlify.
+**Plataforma-alvo**: Navegadores móveis e desktop; aplicação estática existente em Firebase Hosting.
 
-**Tipo de projeto**: Aplicação web client-side, sem backend/API própria.
+**Tipo de projeto**: Aplicação web client-side em React/Vite, sem backend/API própria.
 
-**Metas de desempenho**: RSVP completável em até um minuto; com gestão aberta e anfitrião conectado, submissões aceitas ficam visíveis em até cinco segundos; layout sem rolagem horizontal. Nenhum polling ou serviço de processamento em segundo plano será adicionado.
+**Metas de desempenho**: Operações de mesclagem/exclusão para até 100 convidados ativos devem completar como uma única atualização atômica; manter o limite de atualização da gestão em até cinco segundos. Nenhum polling ou serviço de processamento em segundo plano será adicionado.
 
-**Restrições**: Só o anfitrião se autentica. Dados privados são protegidos por UID proprietário. Convidados podem criar submissões anônimas limitadas, mas não ler inbox, lista ou mensagens; o link de edição dá acesso somente à própria resposta. Sem Cloud Functions, tarefas agendadas, polling adicional ou obrigação de billing. App Check não é requisito e não prova identidade nem fornece rate limiting por pessoa. A localização usa uma foto externa opcional e Google Maps URL, sem Maps API. O Spark permite 100 conexões simultâneas totais por instância, incluindo sessões do anfitrião.
+**Restrições**: Só o anfitrião se autentica; cada mutação administrativa requer proprietário do evento. Sem Cloud Functions, API própria, polling adicional, billing ou dependências novas. Dados inativos continuam privados até exclusão individual, mas não contam para o limite de convidados ativos; re-convidar uma pessoa cria um cadastro ativo novo.
 
-**Escala/Escopo**: Um evento e até 100 convidados cadastrados; esse número não representa simultaneidade. O limite Spark é 100 conexões simultâneas totais por instância, incluindo anfitriões; não há garantia de que todos os convidados possam estar conectados ao mesmo tempo. Falhas de conexão/gravação devem ser recuperáveis e preservar o formulário para nova tentativa.
+**Escala/Escopo**: Até 100 convidados ativos por evento; quantidade de registros inativos sem limite funcional definido, sujeita às cotas Firebase. Mesclagem somente de convidados principais; no máximo um RSVP associado entre os cadastros fonte/destino. Até 20 acompanhantes por RSVP conforme o comportamento existente.
 
 ## Verificação da Constituição
 
 | Gate | Estado | Evidência |
 | --- | --- | --- |
-| Especificação antes da implementação | PASS | [spec.md](spec.md) define jornadas, FRs e critérios mensuráveis. |
-| Rastreabilidade | PASS | Modelo, contrato e guia apontam para entidades e requisitos da feature. |
-| Resultados verificáveis | PASS | [quickstart.md](quickstart.md) define cenários em emuladores e navegador. |
-| Mudanças pequenas e reversíveis | PASS | Cliente web único e SDK oficial, sem serviço backend próprio. |
-| Segurança e privacidade por padrão | CONDITIONAL | Inbox anônima isolada é proposta; Rules e capacidades de edição ainda precisam passar testes no Emulator Suite. Identidade do convidado não é comprovada. |
-| Compatibilidade com custo pretendido | PASS | FR-016 usa endereço, foto externa opcional e Google Maps URL; nenhuma Maps API ou faturamento adicional é necessário. |
+| Especificação antes da implementação | PASS | [spec.md](spec.md) define FR-031 a FR-036 e clarificações de exclusão, mesclagem e acompanhantes. |
+| Rastreabilidade | PASS | Decisões deste plano referenciam FR-026, FR-029 e FR-031 a FR-036; modelo, Rules e quickstart mapeiam operações e estados. |
+| Resultados verificáveis | PASS | [quickstart.md](quickstart.md) define verificações unitárias, Rules e E2E para operações seguras. |
+| Mudanças pequenas e reversíveis | PASS | Reutilizar cliente e repositório existentes; uma chamada multipath dá atomicidade sem backend/dependências novas. |
+| Segurança e privacidade por padrão | PASS (gate de implementação) | Operações restritas ao dono; exclusão também revoga inbox/capacidade; inativos permanecem privados. Rules e testes de integração devem validar cada remoção/mutação. |
+| Compatibilidade com custo pretendido | PASS | Reutiliza Firebase existente, sem APIs pagas, Cloud Functions ou novos serviços. |
 
-**Gate para implementação**: validar Rules de proprietário, leitura pública, submissões anônimas, inbox e edição por link no Emulator Suite. O desenho de inbox elimina a necessidade de revelar o roster, mas não impede spam ou que alguém responda por outra pessoa.
+**Gate para implementação**: provar no Emulator Suite que somente o proprietário pode editar, mesclar, inativar ou excluir convidados, inbox e capacidades; verificar atomicidade e negação a outro UID/anônimo. Bloquear conflitos antes de qualquer gravação. A coleção inativa continua privada.
 
 ## Estrutura do Projeto
 
@@ -76,7 +76,7 @@ tests/
 └── e2e/
 ```
 
-**Decisão de estrutura**: uma aplicação React/Vite. A UI é organizada por fluxo; serviços Firebase ficam isolados; Rules e fluxos e2e têm suítes próprias. A árvore é proposta porque o repositório ainda não contém scaffold de aplicação.
+**Decisão de estrutura**: estender a aplicação React/Vite existente. A UI permanece em `src/features/guests/HostDashboard.jsx` e componentes pequenos de edição/mesclagem; a lógica de transição fica em `src/features/guests/guestRepository.js`; validações de projeção em `participantList.js`; Rules em `database.rules.json`. Testes em `tests/unit`, `tests/rules` e `tests/e2e`.
 
 ## Decisões Técnicas
 
@@ -87,6 +87,14 @@ Separar `publicEvents` do caminho privado `privateEvents`. Convidados leem somen
 ### Edição por link
 
 Usar capacidade aleatória de alta entropia por RSVP como segredo bearer. Cada token autoriza somente leitura e edição da resposta correspondente; não expira automaticamente. O anfitrião pode revogar o token e emitir outro, invalidando o anterior; não há reenvio automatizado, e o convidado solicita novo acesso ao anfitrião. Não permitir token para listar inbox/roster ou ler outros RSVP. Evitar incluir o token em analytics e links de terceiros; validar Rules de leitura, edição e revogação no emulador antes de liberar implementação. Edições concorrentes pela mesma capacidade usam a última gravação aceita.
+
+### Gestão avançada de convidados
+
+Editar cadastro modifica somente nome/normalização e telefone. Excluir principal com RSVP remove seu cadastro, a inbox e capacidade vinculadas após confirmação explícita; a mesma gravação move os registros de acompanhantes previamente cadastrados para `inactiveGuests` com estado `inactive`. A área de inativos oferece exclusão individual, que apaga somente o item escolhido. A coleção ativa mantém os slots `guest-001`–`guest-100`; inativos não consomem vagas nem aparecem em totais/exportações. Um novo cadastro não reativa automaticamente um inativo.
+
+Mesclar principal A em B: verificar antes de escrever se ambos não têm RSVPs concorrentes e seus telefones não conflitam; em conflito abortar sem alterações e orientar resolução manual. B mantém seu nome; se telefone de B está vazio, copia-se A. Se A tem o único RSVP, transferir decisão, mensagem, timestamps, acompanhantes e associação `guestId` nos metadados inbox/capacidade para B; mover/reparentar cadastros espelho e apagar A. Se ambos não têm RSVP, combinar somente cadastros e vínculos de acompanhantes. A lista combinada deduplica por nome normalizado+idade. Uma remoção individual de acompanhante modifica a projeção do RSVP e elimina o espelho da mesma pessoa, sem tocar nos demais.
+
+Todas as mudanças que cruzam roster, inbox, capacidades e arquivo inativo são um único `update()` multipath do Firebase, após leitura privada e validação de pré-condições; erro de autorização, conflito de dados ou falha de rede não pode deixar gravação parcial. Security Rules para remoção da capacidade verificam `eventId` persistido em `data`, já que `newData` não existe ao apagar.
 
 ### Mapas
 
@@ -102,10 +110,10 @@ Sem backend adicional. A inbox separada evita dar leitura pública à lista e ma
 
 ## Pendências de Liberação
 
-1. Validar no Emulator Suite isolamento entre anfitriões, leitura pública limitada, gravação anônima, revogação e escopo individual do link de edição.
-2. Confirmar hosting e provedor externo de imagens antes do deploy, sem adotar serviço que exija pagamento para os limites pretendidos.
-3. Exercitar falhas no limite de conexões/gravações e confirmar que o formulário preserva dados para nova tentativa; o Emulator Suite não comprova quotas reais do Spark.
-4. Verificar os fluxos de mensagem associada, renomeação com nova revisão, conflitos de edição e carregamento acessível das imagens.
+1. Testar no Emulator Suite leitura e mutação de `inactiveGuests` por proprietário, outro UID e visitante anônimo, incluindo remoções autorizadas da capacidade pelo `eventId` persistido.
+2. Validar com testes unitários pré-condições de mesclagem, transferência do único RSVP e deduplicação de acompanhantes por nome normalizado/idade; falhas impeditivas não podem gravar dados.
+3. Validar E2E de edição cadastral sem alteração de RSVP, exclusão/cancelamento, inativação, remoção individual e mesclagem com e sem conflitos.
+4. Executar as suítes unitária, Rules e E2E e `npm run build`; confirmar contagem de 100 convidados ativos mesmo com inativos arquivados.
 
 ## Artefatos
 

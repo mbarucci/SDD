@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import EventGalleryEditor from './EventGalleryEditor.jsx';
 import LocationEditor from './LocationEditor.jsx';
+import EventInvitation from './EventInvitation.jsx';
 
 const emptyEvent = {
   title: '',
@@ -46,7 +47,8 @@ export default function EventEditor({ event, onBack, onPublish, onSave }) {
       <button className="back-link" onClick={onBack} type="button">Voltar aos eventos</button>
       <p className="eyebrow">CONFIGURAÇÃO DO EVENTO</p>
       <h2 id="event-editor-title">{event?.id ? 'Editar evento' : 'Novo evento'}</h2>
-      <form onSubmit={(submitEvent) => { submitEvent.preventDefault(); void save(); }}>
+      <div className="event-editor-layout">
+        <form onSubmit={(submitEvent) => { submitEvent.preventDefault(); void save(); }}>
         <label htmlFor="event-title">Título</label>
         <input id="event-title" onChange={(inputEvent) => update('title', inputEvent.target.value)} required value={draft.title} />
 
@@ -75,22 +77,31 @@ export default function EventEditor({ event, onBack, onPublish, onSave }) {
 
         <EventGalleryEditor onChange={(photos) => update('photos', photos)} photos={draft.photos ?? []} />
 
-        {error && <p className="form-error" role="alert">{error}</p>}
-        {status && <p className="form-status" role="status">{status}</p>}
-        <div className="form-actions">
-          <button className="primary-button" disabled={busy} type="submit">Salvar rascunho</button>
-          {event?.id && event.status !== 'published' && (
-            <button
-              className="secondary-button"
-              disabled={busy}
-              onClick={(clickEvent) => {
-                if (clickEvent.currentTarget.form.reportValidity()) void save(true);
-              }}
-              type="button"
-            >Publicar evento</button>
-          )}
-        </div>
-      </form>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          {status && <p className="form-status" role="status">{status}</p>}
+          <div className="form-actions">
+            <button className="primary-button" disabled={busy} type="submit">Salvar rascunho</button>
+            {event?.id && event.status !== 'published' && (
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={(clickEvent) => {
+                  if (clickEvent.currentTarget.form.reportValidity()) void save(true);
+                }}
+                type="button"
+              >Publicar evento</button>
+            )}
+          </div>
+        </form>
+        <section aria-label="Prévia do convite" className="event-live-preview">
+          <p className="eyebrow">PRÉVIA DO CONVITE</p>
+          <div className="event-preview-canvas" inert>
+            <div className="public-experience event-preview-experience">
+              <EventInvitation event={draft} idPrefix="preview" />
+            </div>
+          </div>
+        </section>
+      </div>
       {event?.status === 'published' && <p>O evento está publicado e visível aos convidados.</p>}
     </section>
   );

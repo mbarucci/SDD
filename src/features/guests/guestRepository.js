@@ -1,11 +1,15 @@
 import { get, onValue, push, ref, runTransaction, update } from 'firebase/database';
 import { getFirebaseClient } from '../../services/firebase/client.js';
-import { editCapabilityPath, inboxPath, rosterPath } from '../../services/firebase/paths.js';
+import { editCapabilityPath, inboxPath, inactiveGuestsPath, rosterPath } from '../../services/firebase/paths.js';
 import { normalizeName } from './normalizeName.js';
 import { normalizeGuestFields, normalizePhone } from './guestFields.js';
 import { guestImportKey, prepareGuestImport } from './guestImport.js';
+import { confirmedParticipants, topLevelGuests } from './participantList.js';
 
 export { normalizePhone } from './guestFields.js';
+
+const disabledCapabilityTokens = new Set();
+let pendingReconciliationWrite = Promise.resolve();
 
 function database() {
   return getFirebaseClient().database;
@@ -17,6 +21,46 @@ function guestSlotPath(eventId, slot) {
 
 function submissionInboxPath(eventId, submissionId) {
   return `${inboxPath(eventId)}/${submissionId}`;
+}
+
+function inactiveGuestPath(eventId, guestId) {
+  return `${inactiveGuestsPath(eventId)}/${guestId}`;
+}
+
+function eventGuestSummary(guests) {
+  const primaryGuests = topLevelGuests(guests);
+
+  return {
+    pending: primaryGuests.filter((guest) => guest.status === 'pending').length,
+    confirmed: confirmedParticipants(guests).length,
+    declined: primaryGuests.filter((guest) => guest.status === 'declined').length,
+  };
+}
+
+export async function getEventGuestSummary(eventId) {
+  const snapshot = await get(ref(database(), rosterPath(eventId)));
+  const guests = Object.entries(snapshot.val() ?? {}).map(([slot, guest]) => ({ ...guest, slot }));
+  return eventGuestSummary(guests);
+}
+
+export function listenToEventGuestSummaries(events, onChange) {
+  let active = true;
+  const stops = events.map((event) => onValue(
+    ref(database(), rosterPath(event.id)),
+    (snapshot) => {
+      if (!active) return;
+      const guests = Object.entries(snapshot.val() ?? {}).map(([slot, guest]) => ({ ...guest, slot }));
+      onChange(event.id, { state: 'ready', ...eventGuestSummary(guests) });
+    },
+    (error) => {
+      if (active) onChange(event.id, { state: 'error', error });
+    },
+  ));
+
+  return () => {
+    active = false;
+    for (const stop of stops) stop();
+  };
 }
 
 function capabilityRecord(submission, changes) {
@@ -42,8 +86,8 @@ function inboxRecord(submission, changes) {
     updatedAt: submission.updatedAt,
     status: submission.status,
     companions: submission.companions?.length ? submission.companions : null,
-    ...changes,
     token: submission.token,
+    ...changes,
   };
   delete next.inboxKey;
   delete next.inboxRecord;
@@ -156,6 +200,281 @@ export async function saveGuestPhone(eventId, guest, value) {
   });
 }
 
+export async function updateExpectedGuest(eventId, guest, name, phone) {
+  if (!guest?.slot || guest.guestRole === 'companion') {
+    throw new Error('Somente convidados principais podem ser editados.');
+  }
+  const fields = normalizeGuestFields(name, phone);
+  await update(ref(database()), {
+    [`${guestSlotPath(eventId, guest.slot)}/name`]: fields.name,
+    [`${guestSlotPath(eventId, guest.slot)}/normalizedName`]: normalizeName(fields.name),
+    [`${guestSlotPath(eventId, guest.slot)}/phone`]: fields.phone || null,
+  });
+}
+
+function findSubmission(inbox, submissionId) {
+  return Object.entries(inbox ?? {}).find(([key, record]) => key === submissionId || record.submissionId === submissionId);
+}
+
+function companionKey(companion) {
+  return `${normalizeName(companion.name)}\u0000${Number(companion.age)}`;
+}
+
+function deduplicateCompanions(companions) {
+  const unique = new Map();
+  for (const companion of companions) {
+    if (!companion || typeof companion.name !== 'string' || !Number.isInteger(Number(companion.age))) {
+      throw new Error('Não foi possível mesclar acompanhantes inválidos.');
+    }
+    const name = companion.name.trim().replace(/\s+/gu, ' ');
+    const age = Number(companion.age);
+    if (!name || name.length > 100 || age < 0 || age > 120) {
+      throw new Error('Não foi possível mesclar acompanhantes inválidos.');
+    }
+    const normalized = { name, age };
+    unique.set(companionKey(normalized), normalized);
+  }
+  if (unique.size > 20) {
+    throw new Error('A mesclagem ultrapassaria o limite de 20 acompanhantes.');
+  }
+  return [...unique.values()];
+}
+
+function companionArchiveRecord(guest, inactiveAt) {
+  return {
+    guestId: guest.guestId,
+    name: guest.name,
+    normalizedName: guest.normalizedName,
+    status: 'inactive',
+    inactiveAt,
+    ...(guest.phone && { phone: guest.phone }),
+  };
+}
+
+export async function deleteExpectedGuest(eventId, guest) {
+  if (!guest?.guestId || !guest.slot || guest.guestRole === 'companion') {
+    throw new Error('Selecione um convidado principal válido para excluir.');
+  }
+  const db = database();
+  const [rosterSnapshot, inboxSnapshot] = await Promise.all([
+    get(ref(db, rosterPath(eventId))),
+    get(ref(db, inboxPath(eventId))),
+  ]);
+  const roster = rosterSnapshot.val() ?? {};
+  const currentGuest = roster[guest.slot];
+  if (!currentGuest || currentGuest.guestId !== guest.guestId) {
+    throw new Error('O convidado não existe mais. Atualize a lista.');
+  }
+  const inbox = inboxSnapshot.val() ?? {};
+  const linkedSubmission = currentGuest.submissionId
+    ? findSubmission(inbox, currentGuest.submissionId)
+    : null;
+  if (currentGuest.submissionId && !linkedSubmission) {
+    throw new Error('Não foi possível localizar o RSVP associado. Atualize a lista antes de excluir.');
+  }
+
+  const writes = { [guestSlotPath(eventId, guest.slot)]: null };
+  if (linkedSubmission) {
+    const [submissionId, record] = linkedSubmission;
+    if (!record.token) throw new Error('Não foi possível localizar o link de edição associado.');
+    writes[submissionInboxPath(eventId, submissionId)] = null;
+    writes[editCapabilityPath(record.token)] = null;
+  }
+
+  const inactiveAt = Date.now();
+  for (const [slot, companion] of Object.entries(roster)) {
+    if (
+      companion.guestRole !== 'companion'
+      || companion.companionOfGuestId !== currentGuest.guestId
+      && companion.companionOfSubmissionId !== currentGuest.submissionId
+    ) continue;
+    writes[guestSlotPath(eventId, slot)] = null;
+    writes[inactiveGuestPath(eventId, companion.guestId)] = companionArchiveRecord(companion, inactiveAt);
+  }
+  if (linkedSubmission) disabledCapabilityTokens.add(linkedSubmission[1].token);
+  try {
+    await pendingReconciliationWrite;
+    await update(ref(db), writes);
+  } catch (error) {
+    if (linkedSubmission) disabledCapabilityTokens.delete(linkedSubmission[1].token);
+    throw error;
+  }
+}
+
+export async function deleteInactiveGuest(eventId, guest) {
+  if (!guest?.guestId) throw new Error('Selecione um acompanhante inativo válido para excluir.');
+  await update(ref(database()), {
+    [inactiveGuestPath(eventId, guest.guestId)]: null,
+  });
+}
+
+function comparablePhone(phone) {
+  return normalizePhone(phone ?? '').replace(/[^+0-9]/gu, '');
+}
+
+export async function mergeExpectedGuests(eventId, source, target) {
+  if (!source?.guestId || !source.slot || !target?.guestId || !target.slot || source.guestId === target.guestId) {
+    throw new Error('Selecione dois convidados principais diferentes para mesclar.');
+  }
+  if (source.guestRole === 'companion' || target.guestRole === 'companion') {
+    throw new Error('Somente convidados principais podem ser mesclados.');
+  }
+
+  const db = database();
+  const [rosterSnapshot, inboxSnapshot] = await Promise.all([
+    get(ref(db, rosterPath(eventId))),
+    get(ref(db, inboxPath(eventId))),
+  ]);
+  const roster = rosterSnapshot.val() ?? {};
+  const sourceGuest = roster[source.slot];
+  const targetGuest = roster[target.slot];
+  if (
+    !sourceGuest || sourceGuest.guestId !== source.guestId
+    || !targetGuest || targetGuest.guestId !== target.guestId
+  ) {
+    throw new Error('Um dos convidados não existe mais. Atualize a lista.');
+  }
+  if (sourceGuest.submissionId && targetGuest.submissionId) {
+    throw new Error('Não é possível mesclar convidados que ambos possuem respostas. Resolva os RSVPs primeiro.');
+  }
+  if (
+    comparablePhone(sourceGuest.phone) && comparablePhone(targetGuest.phone)
+    && comparablePhone(sourceGuest.phone) !== comparablePhone(targetGuest.phone)
+  ) {
+    throw new Error('Não é possível mesclar convidados com telefones diferentes. Resolva os telefones primeiro.');
+  }
+
+  const inbox = inboxSnapshot.val() ?? {};
+  const submissionId = sourceGuest.submissionId ?? targetGuest.submissionId;
+  const submissionEntry = submissionId ? findSubmission(inbox, submissionId) : null;
+  if (submissionId && !submissionEntry) {
+    throw new Error('Não foi possível localizar o RSVP associado. Atualize a lista antes de mesclar.');
+  }
+  const linkedCompanions = Object.entries(roster).filter(([, item]) => (
+    item.guestRole === 'companion'
+    && (item.companionOfGuestId === sourceGuest.guestId || item.companionOfGuestId === targetGuest.guestId)
+  ));
+  let submission = null;
+  if (submissionEntry) {
+    const [inboxKey, inboxRecordValue] = submissionEntry;
+    if (!inboxRecordValue.token) throw new Error('Não foi possível localizar o link de edição associado.');
+    const capabilitySnapshot = await get(ref(db, editCapabilityPath(inboxRecordValue.token)));
+    if (!capabilitySnapshot.exists()) throw new Error('O link de edição associado não existe mais. Atualize a lista.');
+    submission = {
+      ...capabilitySnapshot.val(),
+      submissionId,
+      token: inboxRecordValue.token,
+      inboxKey,
+      inboxRecord: inboxRecordValue,
+    };
+  }
+  const submissionCompanions = submission?.companions
+    ? Array.isArray(submission.companions) ? submission.companions : Object.values(submission.companions)
+    : [];
+  const mergedCompanions = submission
+    ? deduplicateCompanions([
+        ...submissionCompanions,
+        ...linkedCompanions.map(([, item]) => ({ name: item.name, age: item.companionAge })),
+      ])
+    : [];
+  const mergedGuest = {
+    ...targetGuest,
+    ...(targetGuest.phone ? {} : sourceGuest.phone ? { phone: sourceGuest.phone } : {}),
+  };
+  if (submission) {
+    mergedGuest.status = submission.decision;
+    mergedGuest.submissionId = submission.submissionId;
+    mergedGuest.updatedAt = submission.updatedAt;
+    mergedGuest.decision = submission.decision;
+    if (sourceGuest.submissionId) {
+      mergedGuest.associationSource = sourceGuest.associationSource ?? 'manual';
+    }
+    if (mergedCompanions.length) mergedGuest.companions = mergedCompanions;
+    else delete mergedGuest.companions;
+  }
+
+  const writes = {
+    [guestSlotPath(eventId, source.slot)]: null,
+    [guestSlotPath(eventId, target.slot)]: mergedGuest,
+  };
+  if (submission) {
+    const updated = capabilityRecord(submission, { guestId: targetGuest.guestId });
+    if (mergedCompanions.length) updated.companions = mergedCompanions;
+    else delete updated.companions;
+    writes[editCapabilityPath(submission.token)] = updated;
+    writes[submissionInboxPath(eventId, submission.inboxKey)] = inboxRecord(submission, {
+      guestId: targetGuest.guestId,
+      companions: mergedCompanions.length ? mergedCompanions : null,
+    });
+  }
+
+  if (submission) {
+    const companionKeys = new Set(mergedCompanions.map(companionKey));
+    const retainedKeys = new Set();
+    for (const [slot, companion] of linkedCompanions) {
+      const key = companionKey({ name: companion.name, age: companion.companionAge });
+      if (!companionKeys.has(key) || retainedKeys.has(key)) {
+        writes[guestSlotPath(eventId, slot)] = null;
+        continue;
+      }
+      retainedKeys.add(key);
+      writes[guestSlotPath(eventId, slot)] = {
+        ...companion,
+        status: submission.decision,
+        decision: submission.decision,
+        companionOfGuestId: targetGuest.guestId,
+        companionOfSubmissionId: submission.submissionId,
+      };
+    }
+  }
+  await update(ref(db), writes);
+}
+
+export async function removeGuestCompanion(eventId, guest, removedCompanion) {
+  if (!guest?.slot || !guest.submissionId || !removedCompanion || typeof removedCompanion.name !== 'string') {
+    throw new Error('Selecione um acompanhante válido para excluir.');
+  }
+  const db = database();
+  const [rosterSnapshot, inboxSnapshot] = await Promise.all([
+    get(ref(db, rosterPath(eventId))),
+    get(ref(db, inboxPath(eventId))),
+  ]);
+  const roster = rosterSnapshot.val() ?? {};
+  const currentGuest = roster[guest.slot];
+  const inbox = inboxSnapshot.val() ?? {};
+  const submissionEntry = findSubmission(inbox, guest.submissionId);
+  if (!currentGuest || currentGuest.guestId !== guest.guestId || !submissionEntry) {
+    throw new Error('A resposta do convidado não existe mais. Atualize a lista.');
+  }
+  const [submissionId, record] = submissionEntry;
+  if (!record.token) throw new Error('Não foi possível localizar o link de edição associado.');
+  const currentCompanions = record.companions
+    ? Array.isArray(record.companions) ? record.companions : Object.values(record.companions)
+    : [];
+  const companionIndex = currentCompanions.findIndex((item) => companionKey(item) === companionKey(removedCompanion));
+  const remaining = companionIndex < 0
+    ? currentCompanions
+    : currentCompanions.filter((_, index) => index !== companionIndex);
+  const writes = {};
+  if (companionIndex >= 0) {
+    writes[guestSlotPath(eventId, guest.slot) + '/companions'] = remaining.length ? remaining : null;
+    writes[editCapabilityPath(record.token) + '/companions'] = remaining.length ? remaining : null;
+    writes[submissionInboxPath(eventId, submissionId) + '/companions'] = remaining.length ? remaining : null;
+  }
+  for (const [slot, companion] of Object.entries(roster)) {
+    if (
+      companion.guestRole === 'companion'
+      && companion.companionOfGuestId === currentGuest.guestId
+      && companion.companionOfSubmissionId === submissionId
+      && companionKey({ name: companion.name, age: companion.companionAge }) === companionKey(removedCompanion)
+    ) writes[guestSlotPath(eventId, slot)] = null;
+  }
+  if (Object.keys(writes).length === 0) {
+    throw new Error('O acompanhante não existe mais. Atualize a lista.');
+  }
+  await update(ref(db), writes);
+}
+
 export async function addExpectedGuest(eventId, name, phone = '') {
   const { name: displayName, phone: normalizedPhone } = normalizeGuestFields(name, phone);
   const normalizedName = normalizeName(displayName);
@@ -228,21 +547,46 @@ export async function importExpectedGuests(eventId, rows) {
 export function listenToEventManagement(eventId, onChange) {
   const db = database();
   let guests = {};
+  let inactiveGuests = {};
   let inbox = {};
+  let active = true;
   const submissions = new Map();
   const capabilityListeners = new Map();
+  const initialLoads = new Set(['guests', 'inactiveGuests', 'inbox']);
+  const pendingCapabilities = new Set();
+  const errors = new Map();
 
   function publish() {
+    if (!active) return;
     onChange({
+      eventId,
       guests: Object.entries(guests).map(([slot, guest]) => ({ ...guest, slot })),
+      inactiveGuests: Object.values(inactiveGuests),
       submissions: [...submissions.values()],
+      error: errors.values().next().value,
+      ready: errors.size === 0 && initialLoads.size === 0 && pendingCapabilities.size === 0,
     });
   }
 
   const stopGuests = onValue(ref(db, rosterPath(eventId)), (snapshot) => {
     guests = snapshot.val() ?? {};
+    initialLoads.delete('guests');
+    errors.delete('guests');
     publish();
-  }, (error) => onChange({ error }));
+  }, (error) => {
+    errors.set('guests', error);
+    publish();
+  });
+
+  const stopInactiveGuests = onValue(ref(db, inactiveGuestsPath(eventId)), (snapshot) => {
+    inactiveGuests = snapshot.val() ?? {};
+    initialLoads.delete('inactiveGuests');
+    errors.delete('inactiveGuests');
+    publish();
+  }, (error) => {
+    errors.set('inactiveGuests', error);
+    publish();
+  });
 
   const stopInbox = onValue(ref(db, inboxPath(eventId)), (snapshot) => {
     inbox = snapshot.val() ?? {};
@@ -253,6 +597,8 @@ export function listenToEventManagement(eventId, onChange) {
         listener.stop();
         capabilityListeners.delete(submissionId);
         submissions.delete(submissionId);
+        pendingCapabilities.delete(submissionId);
+        errors.delete(`capability:${submissionId}`);
       }
     }
 
@@ -261,8 +607,20 @@ export function listenToEventManagement(eventId, onChange) {
       const existing = capabilityListeners.get(submissionId);
       if (existing?.token === token) continue;
       existing?.stop();
+      pendingCapabilities.delete(submissionId);
+      errors.delete(`capability:${submissionId}`);
+      pendingCapabilities.add(submissionId);
 
+      let initialCapabilityLoaded = false;
+      const listener = { token, stop: () => {} };
+      capabilityListeners.set(submissionId, listener);
       const stop = onValue(ref(db, editCapabilityPath(token)), (capabilitySnapshot) => {
+        if (!active || capabilityListeners.get(submissionId)?.token !== token) return;
+        if (!initialCapabilityLoaded) {
+          initialCapabilityLoaded = true;
+          pendingCapabilities.delete(submissionId);
+        }
+        errors.delete(`capability:${submissionId}`);
         if (capabilitySnapshot.exists()) {
           submissions.set(submissionId, {
             ...capabilitySnapshot.val(),
@@ -274,14 +632,26 @@ export function listenToEventManagement(eventId, onChange) {
           submissions.delete(submissionId);
         }
         publish();
-      }, (error) => onChange({ error }));
-      capabilityListeners.set(submissionId, { token, stop });
+      }, (error) => {
+        if (!active || capabilityListeners.get(submissionId)?.token !== token) return;
+        pendingCapabilities.delete(submissionId);
+        errors.set(`capability:${submissionId}`, error);
+        publish();
+      });
+      listener.stop = stop;
     }
+    initialLoads.delete('inbox');
+    errors.delete('inbox');
     publish();
-  }, (error) => onChange({ error }));
+  }, (error) => {
+    errors.set('inbox', error);
+    publish();
+  });
 
   return () => {
+    active = false;
     stopGuests();
+    stopInactiveGuests();
     stopInbox();
     for (const listener of capabilityListeners.values()) listener.stop();
   };
@@ -294,7 +664,7 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
 
   const orderedSubmissions = [...submissions].sort((left, right) => left.updatedAt - right.updatedAt);
   for (const submission of orderedSubmissions) {
-    if (submission.revokedAt) continue;
+    if (submission.revokedAt || disabledCapabilityTokens.has(submission.token)) continue;
     const priorGuestId = submission.previousGuestId;
     if (submission.reviewRequired && priorGuestId) {
       const previousGuest = nextGuests.get(priorGuestId);
@@ -377,7 +747,11 @@ export async function reconcileEventInbox(eventId, guests, submissions) {
     });
   }
 
-  if (Object.keys(writes).length > 0) await update(ref(db), writes);
+  if (Object.keys(writes).length > 0) {
+    const write = pendingReconciliationWrite.then(() => update(ref(db), writes));
+    pendingReconciliationWrite = write.catch(() => {});
+    await write;
+  }
 }
 
 export async function associateInboxSubmission(eventId, submission, guest) {
@@ -491,10 +865,17 @@ async function getGuestById(eventId, guestId) {
 }
 
 export async function deleteInboxSubmission(eventId, submission) {
-  await update(ref(database()), {
-    [submissionInboxPath(eventId, submission.inboxKey)]: null,
-    [editCapabilityPath(submission.token)]: null,
-  });
+  disabledCapabilityTokens.add(submission.token);
+  try {
+    await pendingReconciliationWrite;
+    await update(ref(database()), {
+      [submissionInboxPath(eventId, submission.inboxKey)]: null,
+      [editCapabilityPath(submission.token)]: null,
+    });
+  } catch (error) {
+    disabledCapabilityTokens.delete(submission.token);
+    throw error;
+  }
 }
 
 export async function reissueEditLink(eventId, submission) {
@@ -505,11 +886,18 @@ export async function reissueEditLink(eventId, submission) {
   const revokedCapability = { ...currentCapability, revokedAt: timestamp };
   delete currentCapability.revokedAt;
 
-  await update(ref(db), {
-    [editCapabilityPath(submission.token)]: revokedCapability,
-    [editCapabilityPath(token)]: currentCapability,
-    [submissionInboxPath(eventId, submission.inboxKey)]: inboxRecord(submission, { token }),
-  });
+  disabledCapabilityTokens.add(submission.token);
+  try {
+    await pendingReconciliationWrite;
+    await update(ref(db), {
+      [editCapabilityPath(submission.token)]: revokedCapability,
+      [editCapabilityPath(token)]: currentCapability,
+      [submissionInboxPath(eventId, submission.inboxKey)]: inboxRecord(submission, { token }),
+    });
+  } catch (error) {
+    disabledCapabilityTokens.delete(submission.token);
+    throw error;
+  }
 
   return `/edit/${token}`;
 }

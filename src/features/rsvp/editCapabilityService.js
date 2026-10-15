@@ -6,10 +6,18 @@ import { normalizeCompanions } from './companionValidation.js';
 export async function getEditCapability(token) {
   const { database } = getFirebaseClient();
   const snapshot = await get(ref(database, editCapabilityPath(token)));
-  return snapshot.exists() ? { ...snapshot.val(), token } : null;
+  if (!snapshot.exists()) return null;
+  const capability = snapshot.val();
+  return capability.revokedAt !== undefined && capability.revokedAt !== null
+    ? null
+    : { ...capability, token };
 }
 
 export async function saveEditCapability(capability, fields) {
+  if (
+    !capability
+    || (capability.revokedAt !== undefined && capability.revokedAt !== null)
+  ) throw new Error('Este link não está mais disponível.');
   const { database } = getFirebaseClient();
   const { token, ...record } = capability;
   const name = fields.name.trim();

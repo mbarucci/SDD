@@ -13,6 +13,7 @@ test('anonymous guest views a published event and submits an RSVP without overfl
   await page.getByLabel('Texto alternativo da foto do local', { exact: true }).fill('Jardim do espaço');
   await page.getByRole('button', { name: 'Salvar rascunho' }).click();
   await page.getByRole('button', { name: 'Publicar evento' }).click();
+  await page.getByRole('button', { name: 'Compartilhar', exact: true }).click();
 
   const eventUrl = await page.getByLabel('Link público do evento').inputValue();
   await page.goto('/host');
@@ -27,7 +28,7 @@ test('anonymous guest views a published event and submits an RSVP without overfl
   await expect(page.getByRole('link', { name: 'Abrir no Google Maps' })).toBeVisible();
   await expect(page.getByText(/provedores externos de imagem podem receber seu endereço IP/i)).toBeVisible();
   await expect(page.getByText('Imagem indisponível')).toBeVisible();
-  await expect(page.getByText('Imagem do local indisponível')).toBeVisible();
+  await expect(page.getByText('Imagem do convite indisponível')).toBeVisible();
 
   for (const width of [360, 1280]) {
     await page.setViewportSize({ width, height: 900 });
@@ -38,10 +39,12 @@ test('anonymous guest views a published event and submits an RSVP without overfl
   }
 
   await page.getByLabel('Seu nome').fill('Helena');
-  await page.getByLabel('Vou comparecer').check();
+  await page.getByLabel('Vou').check();
   await page.getByLabel('Mensagem ao anfitrião').fill('Vou levar uma sobremesa.');
-  await page.getByRole('button', { name: 'Enviar resposta' }).click();
+  await page.getByRole('button', { name: 'Confirmar presença' }).click();
   await expect(page.getByRole('heading', { name: 'Resposta enviada' })).toBeVisible();
+  await expect(page.getByText('Guarde o link abaixo: ele permite alterar sua resposta depois.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copiar link de edição' })).toBeVisible();
   await expect(page.getByText('Se não localizar seu nome na lista do anfitrião, confira a grafia ou fale com ele.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Editar minha resposta' })).toHaveAttribute('href', /\/edit\//);
 });
@@ -55,6 +58,7 @@ test('uses the first gallery photo in the invitation hero when no location photo
   await page.getByRole('button', { name: 'Adicionar foto' }).click();
   await page.getByRole('button', { name: 'Salvar rascunho' }).click();
   await page.getByRole('button', { name: 'Publicar evento' }).click();
+  await page.getByRole('button', { name: 'Compartilhar', exact: true }).click();
 
   const eventUrl = await page.getByLabel('Link público do evento').inputValue();
   await page.goto('/host');

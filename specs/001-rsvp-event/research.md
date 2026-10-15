@@ -56,3 +56,37 @@ Fontes: [CSP `img-src`](https://www.w3.org/TR/CSP3/#directive-img-src), [element
 - Validar domínio, redirects de Authentication, cache e transferência do hosting no Spark.
 - Validar limites reais de conexão e transferência no Spark; o emulador não simula essas cotas de produção.
 - Revisar exposição de tokens bearer em URLs, analytics, logs e referrer antes do lançamento.
+
+## Pesquisa complementar: operações do roster de convidados
+
+### Exclusão, inativação e limite de registros
+
+**Decisão**: limitar a 100 os convidados ativos do roster. Ao excluir um convidado principal, remover seu RSVP associado e a respectiva capacidade de edição após confirmação; mover seus cadastros de acompanhantes vinculados para uma coleção privada de inativos, mantendo-os fora das listas, totais e limite de ativos. Permitir exclusão individual dos registros inativos. Um convidado inativo que for recadastrado recebe um novo cadastro ativo, sem reativação implícita do histórico.
+
+**Racional**: o usuário definiu que inativos não devem ocupar vagas, mas precisam permanecer identificáveis e removíveis individualmente. Separar `inactiveGuests` do roster ativo preserva o teto e slots existentes `guest-001` a `guest-100` sem sobrescrever registros arquivados.
+
+**Alternativas consideradas**: manter inativos nos mesmos slots (reduz vagas disponíveis, contrário à decisão); sobrescrever inativos automaticamente ao cadastrar (apaga histórico sem exclusão explícita); expandir sem limite os slots ativos (enfraquece o limite de 100 e altera as Rules de criação).
+
+### Edição e mesclagem de convidados
+
+**Decisão**: editar somente nome e telefone do cadastro, sem modificar RSVP ou acompanhantes. Mesclar somente convidados principais; selecionar o registro destino e executar a transferência do RSVP associado e de seus acompanhantes na mesma gravação atômica multipath do Realtime Database. Bloquear antes de gravar se ambos tiverem respostas associadas, ou se telefones preenchidos divergirem. O nome do destino prevalece; telefone ausente pode receber o valor da origem.
+
+**Racional**: corresponde às regras funcionais FR-031, FR-034 e FR-035 e usa o padrão administrativo já presente em `guestRepository.js`, que organiza correções de associação com `update()` multipath. A gravação única evita estado parcial entre roster, inbox e capacidade de edição.
+
+**Alternativas consideradas**: permitir mesclar respostas concorrentes (ambiguidade de decisão e link); escolher telefone automaticamente em conflito (perda de informação); sequenciar gravações separadas (falhas podem deixar associação inconsistente).
+
+### Reconciliação de acompanhantes
+
+**Decisão**: combinar listas de acompanhantes ao mesclar convidados, identificando a mesma pessoa pela combinação de nome normalizado e idade. Manter uma ocorrência quando as chaves coincidirem; preservar acompanhantes distintos. Permitir remoção individual de um acompanhante do RSVP/cadastro sem excluir o principal ou os demais acompanhantes. Atualizar os vínculos de cadastros já associados para apontarem ao convidado destino.
+
+**Racional**: a chave de deduplicação segue diretamente a regra aprovada em FR-036. Remoções e reparenting precisam sincronizar o RSVP ativo e os registros vinculados para que listas, totais e CSV não contenham duplicatas nem referências órfãs.
+
+**Alternativas consideradas**: deduplicar somente por nome (pode colapsar homônimos); deduplicar por nome, idade e telefone (acompanhante não tem telefone no RSVP); deixar vínculos antigos no cadastro de origem excluído (gera registros órfãos).
+
+### Segurança e interface
+
+**Decisão**: manter operações restritas ao anfitrião proprietário por `auth.uid`; validar novos estados e campos em Security Rules; permitir remoção de RSVP/capacidade e operações multipath somente em contexto autenticado do proprietário. Confirmar exclusões destrutivas na UI e apresentar conflitos impeditivos antes da escrita. Expor inativos somente na área privada do anfitrião.
+
+**Racional**: a regra mantém o modelo sem backend próprio nem novos serviços pagos e preserva a separação público/privado existente. Os testes de Rules verificam o limite de autorização; os testes de integração e E2E verificam atomicidade observável e confirmação.
+
+**Alternativas consideradas**: expor operações ao convidado por token (ultrapassa o escopo administrativo); acrescentar Cloud Functions (nova dependência operacional e potencial custo); permitir leitura pública de inativos (viola privacidade do roster).

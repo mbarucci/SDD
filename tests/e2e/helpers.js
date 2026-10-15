@@ -19,5 +19,5 @@ export async function createDraftEvent(page, title = 'Festa de teste') {
   await page.getByLabel('Horário').fill('19:30');
   await page.getByLabel('Local', { exact: true }).fill('Avenida Paulista, 1000, São Paulo');
   await page.getByRole('button', { name: 'Salvar rascunho' }).click();
-  await expect(page.getByRole('status')).toContainText('Rascunho salvo');
+  await expect(page.getByText('Rascunho salvo')).toBeVisible();
 }

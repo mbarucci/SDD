@@ -19,13 +19,13 @@ test('preserves the RSVP fields after a recoverable submission failure', async (
 
   render(<GuestRsvpForm eventId="event-1" />);
   await user.type(screen.getByLabelText('Seu nome'), 'Helena');
-  await user.click(screen.getByLabelText('Vou comparecer'));
+  await user.click(screen.getByLabelText('Vou'));
   await user.type(screen.getByLabelText('Mensagem ao anfitrião'), 'Vou levar uma sobremesa.');
-  await user.click(screen.getByRole('button', { name: 'Enviar resposta' }));
+  await user.click(screen.getByRole('button', { name: 'Confirmar presença' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent('A resposta não foi salva. Tente novamente.');
   expect(screen.getByLabelText('Seu nome')).toHaveValue('Helena');
-  expect(screen.getByLabelText('Vou comparecer')).toBeChecked();
+  expect(screen.getByLabelText('Vou')).toBeChecked();
   expect(screen.getByLabelText('Mensagem ao anfitrião')).toHaveValue('Vou levar uma sobremesa.');
 });
 
@@ -35,11 +35,11 @@ test('submits companion names and ages with a confirmed RSVP', async () => {
 
   render(<GuestRsvpForm eventId="event-1" />);
   await user.type(screen.getByLabelText('Seu nome'), 'Helena');
-  await user.click(screen.getByLabelText('Vou comparecer'));
+  await user.click(screen.getByLabelText('Vou'));
   await user.click(screen.getByRole('button', { name: 'Adicionar acompanhante' }));
   await user.type(screen.getByLabelText('Nome do acompanhante 1'), 'Caio');
   await user.type(screen.getByLabelText('Idade do acompanhante 1'), '7');
-  await user.click(screen.getByRole('button', { name: 'Enviar resposta' }));
+  await user.click(screen.getByRole('button', { name: 'Confirmar presença' }));
 
   expect(submitRsvp).toHaveBeenCalledWith({
     eventId: 'event-1',

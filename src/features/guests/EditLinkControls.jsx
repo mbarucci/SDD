@@ -7,6 +7,7 @@ export default function EditLinkControls({ eventId, submission }) {
   const [busy, setBusy] = useState(false);
 
   async function reissue() {
+    if (!window.confirm('O link atual será revogado e deixará de funcionar. Emitir um novo link de edição?')) return;
     setBusy(true);
     setError('');
     try {

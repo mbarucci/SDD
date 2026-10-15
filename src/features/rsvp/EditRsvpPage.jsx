@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getEditCapability, saveEditCapability } from './editCapabilityService.js';
-import CompanionFields from './CompanionFields.jsx';
+import RsvpFields from './RsvpFields.jsx';
+import { formatRsvpDecision, formatSavedResponseDate } from './rsvpPresentation.js';
 
 function companionList(value) {
   return Array.isArray(value) ? value : Object.values(value ?? {});
@@ -16,6 +17,7 @@ export default function EditRsvpPage({ token }) {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const [savedResponse, setSavedResponse] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -26,6 +28,7 @@ export default function EditRsvpPage({ token }) {
       setDecision(value?.decision ?? '');
       setMessage(value?.message ?? '');
       setCompanions(companionList(value?.companions));
+      setSavedResponse(value ? { decision: value.decision, updatedAt: value.updatedAt ?? value.createdAt } : null);
       setLoading(false);
     }).catch(() => {
       if (active) setLoading(false);
@@ -50,7 +53,8 @@ export default function EditRsvpPage({ token }) {
       setDecision(updated.decision);
       setMessage(updated.message);
       setCompanions(companionList(updated.companions));
-      setStatus('Resposta atualizada');
+      setSavedResponse({ decision: updated.decision, updatedAt: updated.updatedAt ?? updated.createdAt });
+      setStatus('Resposta atualizada.');
     } catch (saveError) {
       setError(saveError.message || 'Este link não está mais disponível.');
     } finally {
@@ -58,35 +62,43 @@ export default function EditRsvpPage({ token }) {
     }
   }
 
-  if (loading) return <main className="page-loading" role="status">Carregando resposta...</main>;
+  if (loading) return <main className="public-experience page-loading" role="status">Carregando resposta...</main>;
   if (!capability) {
-    return <main className="unavailable-page"><h1>Link de edição indisponível</h1><p>Peça um novo link ao anfitrião.</p></main>;
+    return <main className="public-experience unavailable-page"><h1>Link de edição indisponível</h1><p>Peça um novo link ao anfitrião.</p></main>;
   }
 
+  const savedDate = formatSavedResponseDate(savedResponse?.updatedAt);
+
   return (
-    <main className="edit-rsvp-page">
+    <main className="public-experience edit-rsvp-page">
       <a className="back-link" href={`/event/${encodeURIComponent(capability.eventId)}`}>Voltar ao evento</a>
       <p className="eyebrow">SUA RESPOSTA</p>
       <h1>Editar resposta</h1>
+      {savedResponse && (
+        <p className="saved-response-notice">
+          Você respondeu: <strong className={`response-decision--${savedResponse.decision}`}>{formatRsvpDecision(savedResponse.decision)}</strong>
+          {savedDate && ` (em ${savedDate})`}.
+        </p>
+      )}
       <form onSubmit={handleSubmit}>
-        <label htmlFor="guest-name">Seu nome</label>
-        <input autoComplete="name" id="guest-name" onChange={(event) => setName(event.target.value)} required value={name} />
-        <fieldset>
-          <legend>Você poderá comparecer?</legend>
-          <label><input checked={decision === 'confirmed'} name="decision" onChange={() => setDecision('confirmed')} required type="radio" value="confirmed" /> Vou comparecer</label>
-          <label><input checked={decision === 'declined'} name="decision" onChange={() => setDecision('declined')} type="radio" value="declined" /> Não poderei ir</label>
-        </fieldset>
-        {decision === 'confirmed' && (
-          <CompanionFields companions={companions} idPrefix="edit" onChange={setCompanions} />
-        )}
-        <label htmlFor="guest-message">Mensagem ao anfitrião</label>
-        <textarea id="guest-message" maxLength={500} onChange={(event) => setMessage(event.target.value)} rows="3" value={message} />
-        <p className="character-count">{message.length}/500</p>
+        <RsvpFields
+          companions={companions}
+          decision={decision}
+          disabled={busy}
+          idPrefix="edit"
+          message={message}
+          name={name}
+          onCompanionsChange={setCompanions}
+          onDecisionChange={setDecision}
+          onMessageChange={setMessage}
+          onNameChange={setName}
+        />
         {error && <p className="form-error" role="alert">{error}</p>}
         {status && <p className="form-status" role="status">{status}</p>}
-        <button className="primary-button" disabled={busy} type="submit">{busy ? 'Salvando...' : 'Salvar resposta'}</button>
+        <button className="primary-button" disabled={busy || !decision} type="submit">
+          {busy ? 'Salvando...' : decision === 'confirmed' ? 'Confirmar presença' : decision === 'declined' ? 'Confirmar resposta' : 'Escolha uma resposta'}
+        </button>
       </form>
-      <a className="inline-link" href={`/edit/${encodeURIComponent(token)}`}>Editar minha resposta</a>
     </main>
   );
 }

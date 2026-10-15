@@ -24,4 +24,31 @@ describe('linked companion roster projection', () => {
     expect(topLevelGuests(declined).map(({ name }) => name)).toEqual(['Alex Silva']);
     expect(declined.filter((guest) => guest.status === 'declined')).toHaveLength(2);
   });
+
+  it('excludes inactive guests from active projections and deduplicates linked companions by name and age', () => {
+    const active = {
+      guestId: 'principal',
+      name: 'Alex Silva',
+      status: 'confirmed',
+      companions: [
+        { name: 'Bento Silva', age: 7 },
+        { name: 'BENTO  SILVA', age: 7 },
+        { name: 'Bento Silva', age: 8 },
+      ],
+    };
+    const roster = [
+      active,
+      {
+        guestId: 'child', name: 'Bento Silva', status: 'confirmed', guestRole: 'companion',
+        companionOfGuestId: 'principal', companionOfSubmissionId: 'submission', companionAge: 7,
+      },
+      { guestId: 'inactive', name: 'Caio Silva', status: 'inactive' },
+    ];
+    expect(confirmedParticipants(roster).map(({ name, age }) => [name, age])).toEqual([
+      ['Alex Silva', ''],
+      ['Bento Silva', 7],
+      ['Bento Silva', 8],
+    ]);
+    expect(topLevelGuests(roster).map(({ guestId }) => guestId)).toEqual(['principal']);
+  });
 });

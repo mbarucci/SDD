@@ -1,6 +1,6 @@
 import { MAX_COMPANIONS } from './companionValidation.js';
 
-export default function CompanionFields({ companions, idPrefix, onChange }) {
+export default function CompanionFields({ companions, idPrefix, onChange, disabled = false }) {
   function updateCompanion(index, field, value) {
     onChange(companions.map((companion, currentIndex) => (
       currentIndex === index ? { ...companion, [field]: value } : companion
@@ -8,7 +8,7 @@ export default function CompanionFields({ companions, idPrefix, onChange }) {
   }
 
   return (
-    <fieldset className="companion-fieldset">
+    <fieldset className="companion-fieldset" disabled={disabled}>
       <legend>Acompanhantes</legend>
       <p>Informe o nome e a idade de cada pessoa que irá com você.</p>
       {companions.map((companion, index) => (
@@ -43,7 +43,7 @@ export default function CompanionFields({ companions, idPrefix, onChange }) {
       ))}
       <button
         className="secondary-button"
-        disabled={companions.length >= MAX_COMPANIONS}
+        disabled={disabled || companions.length >= MAX_COMPANIONS}
         onClick={() => onChange([...companions, { name: '', age: '' }])}
         type="button"
       >

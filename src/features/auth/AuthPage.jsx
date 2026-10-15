@@ -8,6 +8,8 @@ import {
 const messages = {
   'auth/email-already-in-use': 'Este e-mail já possui uma conta.',
   'auth/invalid-credential': 'E-mail ou senha não conferem.',
+  'auth/user-not-found': 'E-mail ou senha não conferem.',
+  'auth/wrong-password': 'E-mail ou senha não conferem.',
   'auth/invalid-email': 'Informe um e-mail válido.',
   'auth/weak-password': 'A senha precisa ter pelo menos seis caracteres.',
 };

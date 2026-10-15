@@ -146,6 +146,7 @@ description: "Lista de tarefas para implementação da feature RSVP de Festa"
 - **US1 (P1)**: Após Phase 2; não depende de outra história.
 - **US2 (P1)**: Após US1, pois usa os eventos publicados e seus links; T023 implementa as Rules exercitadas por T021 antes do fluxo anônimo.
 - **US3 (P2)**: Após US2, pois associa e administra os RSVP recebidos; T032 valida o limite de roster antes de T036 alterar as Rules.
+- **Extensão de gestão da US3 (Phase 8)**: Depende das estruturas de convidados, inbox e capacidade de edição já entregues em US2/US3. T060–T063 adicionam primeiro os testes; T064 implementa paths e Rules; T065 depende das Rules e implementa edição/exclusão/arquivo; T066 depende do repositório de T065 e adiciona mesclagem/remoção individual de acompanhantes; T067 depende das operações do repositório; T068 depende de todas as tarefas da extensão.
 
 ### Parallel Opportunities
 
@@ -154,6 +155,7 @@ description: "Lista de tarefas para implementação da feature RSVP de Festa"
 - US1: T010–T012 podem ser escritos em paralelo; implementação de galeria (T017), localização (T018) e compartilhamento (T019) usa arquivos distintos após autenticação e evento base.
 - US2: T020–T022 podem ser escritos em paralelo; após T023, T024 e T027 atuam em arquivos distintos.
 - US3: T030–T033 podem ser escritos em paralelo; T034 é requisito para matching em T038; T032 deve passar antes de T036.
+- Extensão da US3: T060–T063 podem ser escritos em paralelo em arquivos de teste distintos. Após os testes, T064 implementa Rules e paths; T065 deve passar antes de T066; T067 integra as operações depois de T065–T066; T068 executa a validação completa.
 - Polish: T042, T043 e T044 podem ser preparados em paralelo após as histórias; T045 depende dos testes T044 e da auditoria T042, pois altera os mesmos componentes; T046 executa a suíte completa após T045.
 
 ### Parallel Example: User Story 2
@@ -165,6 +167,23 @@ T021 testes de Rules para visitante anônimo
 T022 testes Playwright do token de edição
 
 Depois de T023 (Rules), implementar T024 (leitura pública) e T027 (capacidade individual) em paralelo.
+```
+
+### Parallel Example: User Story 3 guest management extension
+
+```text
+Após a gestão atual de US3, escrever em paralelo:
+T060 testes de Security Rules para arquivo inativo e remoção de capacidade
+T061 testes de operações de convidados em guest-repository.test.js
+T062 testes de projeção de inativos e deduplicação em participant-list.test.js
+T063 testes E2E de edição, exclusão e mesclagem em host-rsvp-management.spec.js
+
+Depois dos testes:
+T064 implementa Rules e caminhos privados
+T065 implementa edição, exclusão e inativação
+T066 implementa mesclagem e remoção de acompanhantes
+T067 integra as ações na UI após as operações do repositório
+T068 roda a validação completa
 ```
 
 ## Implementation Strategy
@@ -184,6 +203,13 @@ Depois de T023 (Rules), implementar T024 (leitura pública) e T027 (capacidade i
 4. US3: anfitrião acompanha lista, resolve inbox e exporta confirmados.
 5. Polish: acessibilidade, regressões, limites Spark e deploy sem billing não aprovado.
 
+### Incremento da gestão de convidados
+
+1. Executar T060–T063 para fixar as regras de acesso e o comportamento esperado.
+2. Implementar T064–T066: Rules privadas, edição/exclusão, arquivo inativo, mesclagem e remoção individual.
+3. Integrar controles acessíveis e confirmações em T067.
+4. Executar T068; demonstrar edição, exclusão segura, 100 convidados ativos com inativos presentes, mesclagem sem duplicatas e bloqueio de conflitos.
+
 ## Notes
 
 - Cada tarefa segue `- [ ] T### [P?] [US#?] descrição com caminho de arquivo`.
@@ -193,22 +219,54 @@ Depois de T023 (Rules), implementar T024 (leitura pública) e T027 (capacidade i
 
 ## Phase 7: Convergence
 
-- [X] T048 CRITICAL Documentar a aceitação explícita dos advisories restantes nas dependências de desenvolvimento, preservar a versão compatível da Firebase CLI e reexecutar testes e auditoria conforme as restrições de segurança da Constituição (contradicts).
-- [X] T049 CRITICAL Traduzir para português brasileiro o comentário explicativo em `.env.example`, conforme a restrição de idioma da Constituição (contradicts).
-- [X] T050 HIGH Orientar o convidado a conferir o nome digitado ou contatar o anfitrião quando a resposta não tiver correspondência, sem revelar a lista privada, conforme FR-020 (missing).
-- [X] T051 MEDIUM Fixar uma versão LTS de Node.js suportada no repositório e alinhar configuração e documentação, conforme a decisão de linguagem/versão do plano (missing).
-- [ ] T052 MEDIUM Validar em um celular a leitura do QR Code e confirmar que ele abre o mesmo evento do link público, conforme FR-005 e US1/AC2 (partial).
-- [X] T053 MEDIUM Adicionar teste de regressão para falha recuperável de gravação que confirme mensagem para tentar novamente e preservação dos dados do formulário, conforme FR-026 e Constituição III (partial).
-- [ ] T054 MEDIUM Validar em projeto Firebase real no plano Spark o Hosting, as rotas/redirects de Authentication e os limites de conexão/transferência antes da divulgação, sem vincular billing, conforme as pendências de liberação do plano (partial).
-- [X] T055 HIGH Implementar RSVP com até 20 acompanhantes vinculados ao RSVP confirmado; validar nome/idade nas Rules e no cliente, editar pelo link individual, projetar cada pessoa como participante adicional no painel e no CSV e limpar acompanhantes quando houver recusa ou reassociação.
+- [X] T048 Documentar a aceitação explícita dos advisories restantes das dependências de desenvolvimento, manter a versão aprovada da Firebase CLI e registrar a validação de segurança em `package.json`, `package-lock.json` e `specs/001-rsvp-event/research.md`.
+- [X] T049 Traduzir para português brasileiro o comentário explicativo em `.env.example`, conforme a restrição de idioma da Constituição.
+- [X] T050 Orientar o convidado a conferir o nome digitado ou contatar o anfitrião quando a resposta não tiver correspondência, sem revelar a lista privada, em `src/features/rsvp/GuestRsvpForm.jsx` e `tests/e2e/guest-rsvp.spec.js`.
+- [X] T051 Fixar a versão LTS de Node.js e alinhar a declaração do runtime e instruções em `.nvmrc`, `package.json` e `README.md`.
+- [ ] T052 Validar em um celular a leitura do QR Code e confirmar que ele abre o mesmo evento do link público em `specs/001-rsvp-event/quickstart.md` e `tests/e2e/event-sharing.spec.js`.
+- [X] T053 Adicionar teste de regressão para falha recuperável de gravação que confirme mensagem para tentar novamente e preservação dos dados do formulário em `tests/e2e/guest-rsvp.spec.js`.
+- [ ] T054 Validar em projeto Firebase real no plano Spark o Hosting, as rotas/redirects de Authentication e os limites de conexão/transferência antes da divulgação, sem vincular billing, e registrar os resultados em `specs/001-rsvp-event/quickstart.md`.
+- [X] T055 Implementar RSVP com até 20 acompanhantes, validando nome/idade nas Rules e no cliente, edição pelo link individual, projeção de participantes no painel/CSV e limpeza ao recusar/reassociar em `src/features/rsvp/`, `src/features/guests/`, `database.rules.json` e `tests/`.
 
 ### Estado das pendências
 
 - [X] T056 [US3] Permitir troca e desfazimento de associações automáticas/manuais em `src/features/guests/guestRepository.js` e `src/features/guests/InboxReview.jsx`, preservando acompanhantes, liberando cadastro anterior e impedindo sobrescrita da revisão administrativa; validar em `tests/unit/guest-repository.test.js`, `tests/rules/guest-rsvp.rules.test.js` e `tests/e2e/host-rsvp-management.spec.js`.
 - [X] T057 [US3] Vincular cadastros pendentes de acompanhantes por correspondência única, herdar decisões do RSVP principal sem duplicar contagens/listas, preservar acompanhantes durante recusa e reconfirmação em `src/features/guests/guestRepository.js` e `src/features/rsvp/editCapabilityService.js`; validar Rules, exportação, painel e transições em `tests/rules/guest-rsvp.rules.test.js`, `tests/unit/participant-list.test.js` e `tests/e2e/host-rsvp-management.spec.js`.
-- [X] T057 [US3] Adicionar telefone privado opcional, editável e removível em `src/features/guests/HostDashboard.jsx` e `src/features/guests/GuestPhoneEditor.jsx`; validar em `database.rules.json` e `tests/rules/guest-management.rules.test.js`, exportar somente para o convidado principal em `src/features/guests/exportConfirmedGuests.js` e testar conteúdo real do CSV em `tests/e2e/host-rsvp-management.spec.js`.
-- [X] T058 [US3] Implementar leitura local de Excel/CSV, mapeamento de colunas, prévia e duplicatas em `src/features/guests/guestImport.js` e `src/features/guests/GuestImport.jsx`; gravar atomicamente em `src/features/guests/guestRepository.js`, mantendo limite e privacidade em `database.rules.json`; validar parser, concorrência e importação real em `tests/unit/guest-import.test.js`, `tests/unit/guest-import-repository.test.js` e `tests/e2e/guest-import.spec.js`.
+- [X] T058 [US3] Adicionar telefone privado opcional, editável e removível em `src/features/guests/HostDashboard.jsx` e `src/features/guests/GuestPhoneEditor.jsx`; validar em `database.rules.json` e `tests/rules/guest-management.rules.test.js`, exportar somente para o convidado principal em `src/features/guests/exportConfirmedGuests.js` e testar conteúdo real do CSV em `tests/e2e/host-rsvp-management.spec.js`.
+- [X] T059 [US3] Implementar leitura local de Excel/CSV, mapeamento de colunas, prévia e duplicatas em `src/features/guests/guestImport.js` e `src/features/guests/GuestImport.jsx`; gravar atomicamente em `src/features/guests/guestRepository.js`, mantendo limite e privacidade em `database.rules.json`; validar parser, concorrência e importação real em `tests/unit/guest-import.test.js`, `tests/unit/guest-import-repository.test.js` e `tests/e2e/guest-import.spec.js`.
 
 - T048 concluído por aceitação explícita do usuário: foram aceitos 11 advisories (7 altos e 4 moderados) restritos à árvore de desenvolvimento de `firebase-tools@15.32.1`; a auditoria de dependências de produção reportou zero vulnerabilidades. O downgrade autorizado para a linha 14 resolveu para `firebase-tools@14.27.0` e elevou o total para 17, incluindo 1 crítico, então foi revertido. Reavaliar o risco ao atualizar a Firebase CLI e antes de um release.
 - T052 depende de leitura física do QR Code com a câmera de um celular; o teste automatizado confirma a imagem, mas não substitui essa validação.
 - T054 depende de credenciais e autorização para um projeto Firebase real no plano Spark; nenhum deploy ou configuração de produção foi realizado.
+
+---
+
+## Phase 8: User Story 3 - Editar, excluir e mesclar convidados (Priority: P2)
+
+**Goal**: Permitir ao anfitrião editar dados cadastrais, excluir convidados e acompanhantes, arquivar acompanhantes vinculados como inativos e mesclar convidados principais sem perder ou duplicar RSVP e participantes.
+
+**Independent Test**: No Firebase Emulator, editar nome/telefone sem alterar RSVP; cancelar e confirmar exclusões, verificar remoção de RSVP/link e inativação; excluir acompanhantes individualmente; mesclar cadastros sem conflito e verificar RSVP/telefone/acompanhantes; confirmar bloqueio sem gravação quando houver dois RSVPs associados ou telefones conflitantes. Validar limite de 100 convidados ativos mesmo com inativos arquivados.
+
+### Tests for User Story 3 guest management extension
+
+- [X] T060 [P] [US3] Adicionar testes de Rules para leitura/escrita/exclusão de `inactiveGuests`, validação do esquema inativo e remoção de capacidade de edição somente pelo proprietário em `tests/rules/guest-management.rules.test.js` e `tests/rules/guest-rsvp.rules.test.js`.
+- [X] T061 [P] [US3] Adicionar testes unitários para edição somente de nome/telefone, exclusão com remoção de RSVP/capacidade, inativação de acompanhantes vinculados, exclusão individual e pré-condições/transferência de mesclagem em `tests/unit/guest-repository.test.js`.
+- [X] T062 [P] [US3] Adicionar testes unitários para ocultar acompanhantes inativos das listas/totais ativos e projetar uma única entrada quando nome normalizado e idade forem iguais após mesclagem em `tests/unit/participant-list.test.js`.
+- [X] T063 [P] [US3] Adicionar fluxos Playwright para edição sem alterar RSVP, exclusão cancelada/confirmada, inativação e remoção individual, mesclagem bem-sucedida e conflitos de mesclagem em `tests/e2e/host-rsvp-management.spec.js`.
+
+### Implementation for User Story 3 guest management extension
+
+- [X] T064 [US3] Atualizar `database.rules.json` e caminhos em `src/services/firebase/paths.js` para permitir somente ao anfitrião proprietário gerir `inactiveGuests`, validar seus campos `guestId`, `name`, `normalizedName`, `phone` e `inactiveAt`, negar acesso anônimo/de outro UID, e validar remoção de capacidades pelo `eventId` persistido em vez de `newData`.
+- [X] T065 [US3] Implementar em `src/features/guests/guestRepository.js` edição cadastral e exclusão de convidado/inativo por atualização multipath; edição altera somente `name` (obrigatório, 1–100 caracteres), `normalizedName` e `phone` opcional (texto de até 40 caracteres, permitido `+`, dígitos, espaços, parênteses, ponto e hífen), sem alterar RSVP/acompanhantes; exclusão remove convidado, inbox e capacidade associadas, move cadastros espelho de acompanhantes para `inactiveGuests` com timestamp e permite apagar um inativo individualmente.
+- [X] T066 [US3] Implementar em `src/features/guests/guestRepository.js` mesclagem de dois convidados principais e remoção individual de acompanhante; bloquear sem gravar se ambos tiverem RSVP ou se telefones preenchidos divergirem, preservar nome do destino e preencher telefone vazio, transferir a única resposta/capacidade/acompanhantes e reparentar cadastros espelho; deduplicar acompanhantes por nome normalizado e idade iguais e preservar os diferentes, respeitando até 20 acompanhantes por RSVP, nome de 1–100 caracteres e idade inteira de 0–120.
+- [X] T067 [US3] Integrar formulários e controles acessíveis para editar, excluir, mesclar e resolver conflitos, apresentar confirmação explícita de exclusão, disponibilizar a lista privada de inativos e permitir remover cada acompanhante individual em `src/features/guests/HostDashboard.jsx`, `src/features/guests/CompanionList.jsx` e componentes de gestão em `src/features/guests/`.
+
+**Checkpoint**: Edição preserva RSVP; exclusões são confirmadas e atômicas; inativos não aparecem como ativos nem ocupam vagas; mesclagem transfere dados sem duplicação e bloqueia conflitos antes de gravar.
+
+---
+
+## Phase 9: Polish & Cross-Cutting Concerns - guest management
+
+**Purpose**: Validar a implementação de gestão avançada contra Rules, fluxos E2E, guia de validação e build.
+
+- [X] T068 Executar `npm run test:unit`, `npm run test:rules`, `npx firebase emulators:exec --only auth,database "npm run test:e2e"`, `npm run build` e `git diff --check`; corrigir falhas em `tests/`, `database.rules.json` e `specs/001-rsvp-event/quickstart.md`.

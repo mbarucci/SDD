@@ -98,4 +98,32 @@ describe('guest roster limits', () => {
     const snapshot = await get(ref(ownerDatabase, 'privateEvents/published-event/guests/guest-002'));
     expect(snapshot.val()).toMatchObject({ name: 'Convidado 2', status: 'pending' });
   });
+
+  it('keeps inactive companion records private, validates them, and allows the owner to delete one', async () => {
+    const inactivePath = 'privateEvents/published-event/inactiveGuests/child-one';
+    const owner = testEnvironment.authenticatedContext('host-one').database();
+    const otherHost = testEnvironment.authenticatedContext('host-two').database();
+    const anonymous = testEnvironment.unauthenticatedContext().database();
+    const inactive = {
+      guestId: 'child-one',
+      name: 'Bento Silva',
+      normalizedName: 'bento silva',
+      status: 'inactive',
+      inactiveAt: 200,
+      phone: '+55 (11) 90000-0000',
+    };
+
+    await assertSucceeds(set(ref(owner, inactivePath), inactive));
+    expect((await get(ref(owner, inactivePath))).val()).toEqual(inactive);
+    await assertFails(get(ref(anonymous, inactivePath)));
+    await assertFails(set(ref(anonymous, `${inactivePath}/name`), 'Intruso'));
+    await assertFails(get(ref(otherHost, inactivePath)));
+    await assertFails(set(ref(otherHost, inactivePath), inactive));
+    await assertFails(set(ref(owner, 'privateEvents/published-event/inactiveGuests/invalid'), {
+      ...inactive,
+      extraField: true,
+    }));
+    await assertSucceeds(remove(ref(owner, inactivePath)));
+    expect((await get(ref(owner, inactivePath))).exists()).toBe(false);
+  });
 });

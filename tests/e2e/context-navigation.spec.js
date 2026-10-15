@@ -5,12 +5,19 @@ test('host sees management actions while the public event exposes only guest nav
   await registerHost(page);
   await createDraftEvent(page, 'Festa contextual');
   await page.getByRole('button', { name: 'Publicar evento' }).click();
+  await page.getByRole('button', { name: 'Compartilhar', exact: true }).click();
   const eventUrl = await page.getByLabel('Link público do evento').inputValue();
 
   await expect(page.getByRole('navigation', { name: 'Gestão do evento' })).toBeVisible();
-  for (const name of ['Evento', 'Convidados', 'Mensagens', 'Compartilhar', 'Exportar confirmados (CSV)']) {
+  const managementNav = page.getByRole('navigation', { name: 'Gestão do evento' });
+  const sectionNames = ['Evento', 'Convidados', 'Mensagens', 'Compartilhar', 'Exportar confirmados'];
+  for (const name of [...sectionNames.slice(0, 4), 'Exportar confirmados']) {
     await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
   }
+  await expect(managementNav.getByRole('button')).toHaveText(sectionNames);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect.poll(() => managementNav.evaluate((nav) => nav.scrollWidth > nav.clientWidth)).toBe(true);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   const guestContext = await browser.newContext();
   const guestPage = await guestContext.newPage();

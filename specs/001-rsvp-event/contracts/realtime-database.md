@@ -36,6 +36,14 @@ Este contrato especifica fronteiras de autorização para o SDK Web. Não define
 - Permitir telefone opcional somente no cadastro privado (`guests/{slot}/phone`), como texto de até 40 caracteres com dígitos e pontuação telefônica; negar leitura/escrita anônima e de outro proprietário. Não replicar telefone na inbox, capacidade de edição ou evento público.
 - Registrar `associationSource` no cadastro como `manual` ou `automatic`. Correções administrativas usam gravação multipath para mover a resposta e acompanhantes e liberar o cadastro anterior sem duplicação; um cadastro ocupado por outra resposta exige desfazimento prévio.
 - Ao desfazer, manter `reviewRequired: true` na capacidade, com estado `unmatched`; o processamento automático ignora essa resposta e o convidado não pode remover a revisão pelo token. A inbox privada mantém somente os campos do seu schema, sem duplicar a flag.
+- Convidados ativos usam os slots `guest-001` a `guest-100`. Autorizar `inactiveGuests/{guestId}` somente ao proprietário e validar o esquema privado do registro inativo. A coleção tem chave estável e não conta para o limite; exclusão individual remove somente o registro inativo selecionado. Um novo cadastro com mesmo nome/telefone pode ser criado sem reativar o histórico.
+- Editar convidado altera somente nome, `normalizedName` e telefone; não pode sobrescrever RSVP, decisão, submissão ou acompanhantes.
+- Excluir convidado exige confirmação na UI. A gravação multipath, autorizada ao proprietário, remove o slot do principal e, se houver RSVP associado, remove o item da inbox e a capacidade correspondente. Cadastros espelho de acompanhantes são movidos para `inactiveGuests` com estado `inactive` e timestamp; remover o RSVP principal também revoga o link de edição.
+- Excluir acompanhante individual remove essa pessoa da lista de acompanhantes no RSVP/inbox/capacidade aplicável e apaga somente seu cadastro espelho, sem alterar o principal ou os demais acompanhantes.
+- Mesclar somente dois convidados principais. Bloquear sem gravação se ambos possuírem RSVP ou se os telefones não vazios forem diferentes. Uma gravação multipath transfere, quando existente, o RSVP, a capacidade de edição e os vínculos de acompanhantes ao principal selecionado; apaga o cadastro de origem. O nome do destino prevalece e telefone ausente pode ser preenchido pela origem.
+- Mesclar acompanhantes por `normalizeName(name)` e idade: mesma chave aparece uma vez; nomes/idades diferentes são preservados. Atualizar `companionOfGuestId` e referências de submissão de todos os cadastros espelho transferidos.
+- A Rules da capacidade de edição deve autorizar exclusão somente ao proprietário identificado pelo `eventId` já persistido (`data`), pois `newData` não existe em uma remoção; testes de Rules cobrem remoção por dono e negação a convidado/terceiro.
+- Incluir `inactiveGuests` na lista de propriedades privadas permitidas em `privateEvents/{eventId}`; validar que nenhum campo ou caminho inativo é criado por convidado anônimo.
 
 ### Submeter RSVP à inbox privada
 
@@ -60,12 +68,21 @@ Este contrato especifica fronteiras de autorização para o SDK Web. Não define
 - Tratar a URL como segredo bearer: analytics, logs, referrer e compartilhamento do link podem expor acesso.
 - Cobrir leitura/gravação da resposta específica com testes no emulador antes de aprovar.
 
+### Excluir, editar e mesclar convidados
+
+- Todas as ações são exclusivas do anfitrião proprietário e não são expostas ao token do convidado.
+- Edição cadastral não altera estado RSVP nem acompanhantes.
+- A exclusão do principal pede confirmação; excluir RSVP associado também remove o token e inbox correspondente. A operação deve ser atômica para evitar RSVP sem cadastro ou cadastro apagado com link ainda válido.
+- Dependentes cadastrados como acompanhantes são movidos a `inactiveGuests`, fora das listas/contagens de ativos e do limite de 100; podem ser excluídos um a um. Falha na atualização deixa todos os registros no estado anterior.
+- Mesclagem aceita no máximo um RSVP entre origem e destino. Conflito de dois RSVPs ou telefones distintos aborta sem gravações; a UI informa a condição e orienta resolução manual.
+- Mesclar acompanhante exige nome normalizado e idade iguais para deduplicar; caso contrário, manter ambas as pessoas. Remover um acompanhante individual afeta somente a entrada selecionada e sua relação espelho.
+
 ## Invariantes de Security Rules
 
 1. Negar por padrão; nenhuma permissão ampla no root ou em ancestral misto.
 2. Proprietário comparado com dado já persistido; o cliente não escolhe nem altera a propriedade.
 3. Dados privados legíveis somente pelo dono autenticado, exceto capacidade individual explicitamente aprovada.
-4. Validar esquema, limites e enumerações em Rules; rejeitar campos adicionais e exclusões que ignorem validação. A lista de acompanhantes aceita somente índices `0`–`19`, nomes de até 100 caracteres e idades inteiras entre 0 e 120. Excluir submissão sem correspondência é uma ação autenticada do proprietário.
+4. Validar esquema, limites e enumerações em Rules; rejeitar campos adicionais e exclusões que ignorem validação. A lista de acompanhantes aceita somente índices `0`–`19`, nomes de até 100 caracteres e idades inteiras entre 0 e 120. Exclusões de convidados, submissões, capacidades e registros inativos são operações autenticadas do proprietário; remoções de capacidades validam a propriedade contra dados persistidos.
 5. Regras são testadas com usuário proprietário, outro usuário autenticado e usuário anônimo no Firebase Emulator Suite.
 6. App Check pode ser avaliado como redução adicional de abuso, mas não é identidade nem garantia contra abuso e não substitui Rules.
 

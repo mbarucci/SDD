@@ -39,13 +39,17 @@ Este modelo é uma proposta para Firebase Realtime Database. Os caminhos exatos 
 - `phone`: telefone privado opcional de até 40 caracteres, armazenado como texto; aceita dígitos, espaços, `+`, `(`, `)`, `.` e `-`. Pode ser editado ou removido sem alterar o RSVP; ausente nos cadastros antigos.
 - `associationSource`: `automatic` ou `manual`, opcional para compatibilidade com cadastros existentes. Uma associação manual não pode ser substituída por uma nova correspondência automática de outra resposta; o campo é removido ao devolver o cadastro a pendente.
 - `normalizedName`: chave derivada de forma Unicode canônica, caixa ignorada e espaços externos/repetidos removidos; acentos e pontuação são preservados.
-- `status`: `pending`, `confirmed` ou `declined`.
+- `status`: `pending`, `confirmed` ou `declined` no roster ativo; `inactive` somente para acompanhantes na coleção de inativos.
 - `companions`: lista privada opcional de até 20 acompanhantes do RSVP confirmado; cada item contém nome (até 100 caracteres) e idade inteira entre 0 e 120. Cada acompanhante conta como participante confirmado adicional.
 - `guestRole`: `companion` para um cadastro preexistente vinculado como acompanhante; esse registro herda o estado do RSVP principal e não é contado como resposta independente.
 - `companionOfGuestId`, `companionOfSubmissionId`, `companionAge`: relação privada com o convidado e a submissão principais e idade informada no RSVP. Só uma correspondência única com cadastro pendente é vinculada automaticamente.
 - Relação: uma resposta associada; nomes duplicados exigem resolução pelo anfitrião.
 
-Importações criam somente entidades de convidado cadastrado, sem persistir o arquivo ou a prévia. A chave de deduplicação combina o nome normalizado e os dígitos do telefone; ausência de telefone equivale a uma string vazia. O roster é gravado por transação para preservar alterações concorrentes e verificar as vagas disponíveis, mantendo os slots `guest-001` a `guest-100`. Cada registro novo recebe ID próprio, estado pendente e data de criação.
+Editar um convidado cadastrado altera somente `name`, `normalizedName` e `phone`; não altera sua resposta, decisão ou acompanhantes. Exclusão do principal remove seu cadastro e, se existir, seu RSVP associado da inbox/capacidade de edição. Cadastros de acompanhantes vinculados são movidos para a coleção privada de inativos com `inactiveAt` e preservam seu próprio `guestId`, nome e telefone até exclusão individual. Registros inativos não entram em totais nem no limite de 100 ativos. Recadastrar uma pessoa inativa cria um novo convidado ativo.
+
+Mesclar convidados principais conserva o cadastro escolhido como destino, nome e estado cadastral; transfere para ele o único RSVP associado e seus metadados, se houver. A operação é bloqueada se ambos tiverem RSVP associado ou se os dois telefones forem preenchidos com valores diferentes. Se o destino não tiver telefone, recebe o da origem. As listas de acompanhantes são combinadas por nome normalizado e idade; entradas iguais mantêm uma ocorrência e entradas distintas são preservadas. Vínculos de acompanhantes cadastrados passam a referenciar o principal resultante. A remoção de um acompanhante individual atualiza a lista RSVP e remove somente o registro espelho correspondente.
+
+Importações criam somente entidades de convidado ativo, sem persistir o arquivo ou a prévia. A chave de deduplicação combina o nome normalizado e os dígitos do telefone; ausência de telefone equivale a uma string vazia. Cadastros inativos não bloqueiam uma nova importação/inscrição da mesma pessoa. O roster ativo é gravado por transação para preservar alterações concorrentes e verificar as vagas disponíveis, mantendo os slots `guest-001` a `guest-100`. Cada registro novo recebe ID próprio, estado pendente e data de criação.
 
 ### Submissão RSVP
 
@@ -98,10 +102,16 @@ publicEvents/{eventId}
 
 privateEvents/{eventId}
   ownerUid
-  guests/{guestId}
+  guests/{guestSlot}
     companions/{index} -> name, age
   inbox/{submissionId}
     companions/{index} -> name, age
+  inactiveGuests/{guestId}
+    guestId
+    name
+    normalizedName
+    phone
+    inactiveAt
 
 publicEditCapabilities/{token}
   eventId
